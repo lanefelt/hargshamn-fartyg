@@ -19,7 +19,7 @@ TZ = ZoneInfo('Europe/Stockholm')
 PAGE = 'https://lanefelt.github.io/hargshamn-fartyg/beta/'
 FORM_ID = '263273393605056'
 FORM_URL = PAGE + '#prenumerera'
-DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn)\.se$', re.I)
+DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn|lanefelt|lexprocura)\.se$', re.I)   # de två sista för test, nämns inte i formuläret
 
 
 def subscribers():
