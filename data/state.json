@@ -1,0 +1,23 @@
+{
+ "ships": {
+  "210546000": {
+   "anchor_start": null,
+   "arrival": null,
+   "before_log": true,
+   "first_seen": "2026-11-24T12:38:47Z",
+   "imo": 9951836,
+   "name": "STELLAMAR",
+   "shipType": 70
+  },
+  "538012110": {
+   "anchor_start": null,
+   "arrival": null,
+   "before_log": true,
+   "first_seen": "2026-11-24T12:38:47Z",
+   "imo": 9559688,
+   "name": "CATHERINE M",
+   "shipType": 70
+  }
+ },
+ "started": "2026-11-24T12:38:47Z"
+}
