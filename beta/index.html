@@ -41,6 +41,10 @@
   table.hist tr:nth-child(even) td { background:var(--bg); }
   table.hist td.n { text-align:right; white-space:nowrap; }
   .histwrap { overflow-x:auto; }
+  .sub { background:#fff; border-left:4px solid var(--cyan); border-radius:6px; padding:16px 16px 14px; margin:22px 0 6px; }
+  .sub h3 { margin:0 0 4px; font-size:16px; color:var(--navy); }
+  .sub p { margin:0 0 12px; font-size:13px; color:var(--muted); line-height:1.45; }
+  header .subl { color:#fff; font-size:12px; border:1px solid #2BA8E0; border-radius:4px; padding:5px 9px; text-decoration:none; white-space:nowrap; }
   footer { font-size:11px; color:var(--muted); padding:16px 14px 28px; max-width:1100px; margin:0 auto; line-height:1.5; }
   .err { background:#FDF2EC; border-left:4px solid #C2410C; padding:10px 12px; margin-bottom:12px; font-size:13px; display:none; }
   @media (max-width:520px) { header .t2 { font-size:18px; } .top img { height:44px; } .stat .n { font-size:22px; } }
@@ -51,6 +55,7 @@
 <header>
   <div><div class="t1">Hargs Hamn KMA</div><div class="t2">Fartyg i Hargshamn</div></div>
   <div class="upd"><b id="upd">Hämtar …</b>uppdateras varannan minut</div>
+  <a class="subl" href="#prenumerera">Prenumerera</a>
 </header>
 <div id="map"></div>
 <main>
@@ -64,6 +69,11 @@
   <h2><span class="dot" style="background:#C2410C"></span>Ligger still i närheten, till exempel på redden</h2><div id="lr"></div>
   <h2><span class="dot" style="background:#2BA8E0"></span>På väg till Hargshamn</h2><div id="lw"></div>
   <h2><span class="dot" style="background:#0B1F33"></span>Senaste anlöp</h2><div id="hist" class="histwrap"></div>
+  <div class="sub" id="prenumerera">
+    <h3>Få listan med e-post varje morgon</h3>
+    <p>Varje morgon kl. 07 skickas fartygen vid kaj och på redden och senaste dygnets ankomster och avgångar. Öppet för adresser på @hargshamn.se och @sveahamn.se.</p>
+    <iframe src="https://form.jotform.com/263273393605056" title="Prenumerera på fartygslistan" style="width:100%;height:520px;border:0;display:block"></iframe>
+  </div>
 </main>
 <footer>
   Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. Karta: © OpenStreetMap-bidragsgivare, sjömärken © OpenSeaMap.<br>
