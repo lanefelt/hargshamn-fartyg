@@ -25,4 +25,5 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
         run: python scripts/dagsrapport.py
