@@ -18,7 +18,7 @@ import logg
 TZ = ZoneInfo('Europe/Stockholm')
 PAGE = 'https://lanefelt.github.io/hargshamn-fartyg/beta/'
 FORM_ID = '263273393605056'
-FORM_URL = 'https://form.jotform.com/' + FORM_ID
+FORM_URL = PAGE + '#prenumerera'
 DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn)\.se$', re.I)
 
 
