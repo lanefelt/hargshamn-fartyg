@@ -2,10 +2,12 @@
 
 Läser loggen i data/ och aktuella AIS-positioner och skickar en sammanfattning.
 Inställningarna ligger som hemliga värden i repot (Settings > Secrets and variables > Actions):
-SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM, MAIL_TO (flera adresser separeras med komma).
-Saknas något av dem skickas inget.
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM och JOTFORM_API_KEY.
+MAIL_TO (valfritt) är fasta mottagare, flera adresser separeras med komma.
+Övriga mottagare hämtas från formuläret "Prenumerera på fartygslistan". Senaste anmälan per
+adress gäller, och bara adresser på @hargshamn.se och @sveahamn.se tas med.
 """
-import os, sys, smtplib, ssl
+import os, sys, smtplib, ssl, json, re, urllib.request
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 from zoneinfo import ZoneInfo
@@ -15,6 +17,35 @@ import logg
 
 TZ = ZoneInfo('Europe/Stockholm')
 PAGE = 'https://lanefelt.github.io/hargshamn-fartyg/beta/'
+FORM_ID = '263273393605056'
+FORM_URL = 'https://form.jotform.com/' + FORM_ID
+DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn)\.se$', re.I)
+
+
+def subscribers():
+    key = os.environ.get('JOTFORM_API_KEY')
+    if not key:
+        return []
+    url = 'https://eu-api.jotform.com/form/%s/submissions?apiKey=%s&limit=1000&orderby=created_at,ASC' % (FORM_ID, key)
+    with urllib.request.urlopen(url, timeout=60) as r:
+        subs = json.load(r).get('content', [])
+    active = {}
+    for sub in sorted(subs, key=lambda x: x.get('created_at', '')):
+        if sub.get('status') == 'DELETED':
+            continue
+        mail, choice = None, ''
+        for a in (sub.get('answers') or {}).values():
+            if a.get('type') == 'control_email' and a.get('answer'):
+                mail = a['answer'].strip().lower()
+            elif a.get('type') in ('control_radio', 'control_dropdown') and a.get('answer'):
+                choice = str(a['answer'])
+        if not mail or not DOMAINS.match(mail):
+            continue
+        if choice.startswith('Avsluta'):
+            active.pop(mail, None)
+        else:
+            active[mail] = True
+    return sorted(active)
 
 
 def t(s):
@@ -41,9 +72,14 @@ def rows(items, cols):
 
 
 def main():
-    need = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM', 'MAIL_TO']
+    need = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM']
     if not all(os.environ.get(k) for k in need):
         print('Inställningar saknas, inget skickas.')
+        return
+    fixed = [m.strip().lower() for m in (os.environ.get('MAIL_TO') or '').split(',') if m.strip()]
+    to = sorted(set(fixed) | set(subscribers()))
+    if not to:
+        print('Inga mottagare.')
         return
     now = datetime.now(timezone.utc)
     state = logg.load('state.json', {'ships': {}})
@@ -72,15 +108,16 @@ def main():
             '<h3 style="color:#0A629E;font-size:13px;margin:10px 0 4px">AVGÅNGAR SENASTE DYGNET</h3>%s'
             '<p style="font-size:13px"><a href="%s" style="color:#0A629E">Se kartan och hela listan</a></p>'
             '<p style="font-size:11px;color:#52606D">Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. Tiderna är svensk tid och bygger på fartygens AIS-sändare.</p>'
+            '<p style="font-size:11px;color:#52606D"><a href="%s" style="color:#52606D">Avsluta eller ändra prenumerationen</a></p>'
             '</div></div></body></html>') % (datum, rows(quay, ['Fartyg', 'Ankom', 'Vid kaj']), rows(wait, ['Fartyg', 'Ligger still sedan', 'Tid']),
-                               rows(arrived, ['Fartyg', 'Ankom']), rows(left, ['Fartyg', 'Ankom', 'Avgick', 'Vid kaj', 'Väntan på redden']), PAGE)
+                               rows(arrived, ['Fartyg', 'Ankom']), rows(left, ['Fartyg', 'Ankom', 'Avgick', 'Vid kaj', 'Väntan på redden']), PAGE, FORM_URL)
     text = 'Fartyg i Hargshamn %s\nVid kaj: %s\nSe %s' % (datum, ', '.join(r[0] for r in quay) or 'inga', PAGE)
 
     msg = EmailMessage()
     msg['Subject'] = 'Fartyg i Hargshamn %s' % datum
     msg['From'] = os.environ['MAIL_FROM']
     msg['To'] = os.environ['MAIL_FROM']
-    msg['Bcc'] = os.environ['MAIL_TO']
+    msg['Bcc'] = ', '.join(to)
     msg.set_content(text)
     msg.add_alternative(html, subtype='html')
     port = int(os.environ['SMTP_PORT'])
@@ -91,7 +128,7 @@ def main():
         with smtplib.SMTP(os.environ['SMTP_HOST'], port) as s:
             s.starttls(context=ssl.create_default_context())
             s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS']); s.send_message(msg)
-    print('Skickat.')
+    print('Skickat till %d mottagare.' % len(to))
 
 
 if __name__ == '__main__':
