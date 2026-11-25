@@ -108,9 +108,9 @@ def main():
             '<h3 style="color:#0A629E;font-size:13px;margin:10px 0 4px">AVGÅNGAR SENASTE DYGNET</h3>%s'
             '<p style="font-size:13px"><a href="%s" style="color:#0A629E">Se kartan och hela listan</a></p>'
             '<p style="font-size:11px;color:#52606D">Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. Tiderna är svensk tid och bygger på fartygens AIS-sändare.</p>'
-            '<p style="font-size:11px;color:#52606D">Vill du sluta få mejlet, eller ska någon läggas till? Kontakta KMA-ansvarig på Hargs Hamn.</p>'
+            '<p style="font-size:11px;color:#52606D"><a href="%s" style="color:#52606D">Avsluta eller ändra prenumerationen</a></p>'
             '</div></div></body></html>') % (datum, rows(quay, ['Fartyg', 'Ankom', 'Vid kaj']), rows(wait, ['Fartyg', 'Ligger still sedan', 'Tid']),
-                               rows(arrived, ['Fartyg', 'Ankom']), rows(left, ['Fartyg', 'Ankom', 'Avgick', 'Vid kaj', 'Väntan på redden']), PAGE)
+                               rows(arrived, ['Fartyg', 'Ankom']), rows(left, ['Fartyg', 'Ankom', 'Avgick', 'Vid kaj', 'Väntan på redden']), PAGE, FORM_URL)
     text = 'Fartyg i Hargshamn %s\nVid kaj: %s\nSe %s' % (datum, ', '.join(r[0] for r in quay) or 'inga', PAGE)
 
     msg = EmailMessage()
