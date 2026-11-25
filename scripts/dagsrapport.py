@@ -3,7 +3,8 @@
 Läser loggen i data/ och aktuella AIS-positioner och skickar en sammanfattning.
 Inställningarna ligger som hemliga värden i repot (Settings > Secrets and variables > Actions):
 SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM och JOTFORM_API_KEY.
-MAIL_TO (valfritt) är fasta mottagare, flera adresser separeras med komma.
+MAIL_TO (valfritt) är fasta mottagare, flera adresser separeras med komma. De får också en rad
+om vilka som får mejlet.
 Övriga mottagare hämtas från formuläret "Prenumerera på fartygslistan". Senaste anmälan per
 adress gäller, och bara adresser på @hargshamn.se och @sveahamn.se tas med.
 """
@@ -19,7 +20,7 @@ TZ = ZoneInfo('Europe/Stockholm')
 PAGE = 'https://lanefelt.github.io/hargshamn-fartyg/'
 FORM_ID = '263273393605056'
 FORM_URL = PAGE + '#prenumerera'
-DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn|lanefelt|lexprocura)\.se$', re.I)   # de två sista för test, nämns inte i formuläret
+DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn)\.se$', re.I)
 
 
 def subscribers():
@@ -76,8 +77,9 @@ def main():
     if not all(os.environ.get(k) for k in need):
         print('Inställningar saknas, inget skickas.')
         return
-    fixed = [m.strip().lower() for m in (os.environ.get('MAIL_TO') or '').split(',') if m.strip()]
-    to = sorted(set(fixed) | set(subscribers()))
+    fixed = sorted({m.strip().lower() for m in (os.environ.get('MAIL_TO') or '').split(',') if m.strip()})
+    subs = [m for m in subscribers() if m not in fixed]
+    to = fixed + subs
     if not to:
         print('Inga mottagare.')
         return
@@ -113,21 +115,31 @@ def main():
                                rows(arrived, ['Fartyg', 'Ankom']), rows(left, ['Fartyg', 'Ankom', 'Avgick', 'Vid kaj', 'Väntan på redden']), PAGE, FORM_URL)
     text = 'Fartyg i Hargshamn %s\nVid kaj: %s\nSe %s' % (datum, ', '.join(r[0] for r in quay) or 'inga', PAGE)
 
-    msg = EmailMessage()
-    msg['Subject'] = 'Fartyg i Hargshamn %s' % datum
-    msg['From'] = os.environ['MAIL_FROM']
-    msg['To'] = os.environ['MAIL_FROM']
-    msg['Bcc'] = ', '.join(to)
-    msg.set_content(text)
-    msg.add_alternative(html, subtype='html')
+    # de fasta mottagarna (MAIL_TO) får också en rad om vilka som får mejlet
+    admin = ('<p style="font-size:11px;color:#52606D;border-top:1px solid #D9E2EC;padding-top:8px">'
+             'Bara till dig: i dag skickat till %d mottagare: %s</p>') % (len(to), ', '.join(to))
+    msgs = []
+    for rcpt, body in ((fixed, html.replace('</div></div></body>', admin + '</div></div></body>')), (subs, html)):
+        if not rcpt:
+            continue
+        msg = EmailMessage()
+        msg['Subject'] = 'Fartyg i Hargshamn %s' % datum
+        msg['From'] = os.environ['MAIL_FROM']
+        msg['To'] = os.environ['MAIL_FROM']
+        msg['Bcc'] = ', '.join(rcpt)
+        msg.set_content(text)
+        msg.add_alternative(body, subtype='html')
+        msgs.append(msg)
     port = int(os.environ['SMTP_PORT'])
     if port == 465:
         with smtplib.SMTP_SSL(os.environ['SMTP_HOST'], port, context=ssl.create_default_context()) as s:
-            s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS']); s.send_message(msg)
+            s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS'])
+            for m in msgs: s.send_message(m)
     else:
         with smtplib.SMTP(os.environ['SMTP_HOST'], port) as s:
             s.starttls(context=ssl.create_default_context())
-            s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS']); s.send_message(msg)
+            s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS'])
+            for m in msgs: s.send_message(m)
     print('Skickat till %d mottagare.' % len(to))
 
 
