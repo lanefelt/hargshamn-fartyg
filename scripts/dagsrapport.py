@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import logg
 
 TZ = ZoneInfo('Europe/Stockholm')
-PAGE = 'https://lanefelt.github.io/hargshamn-fartyg/beta/'
+PAGE = 'https://lanefelt.github.io/hargshamn-fartyg/'
 FORM_ID = '263273393605056'
 FORM_URL = PAGE + '#prenumerera'
 DOMAINS = re.compile(r'^[^@\s]+@(hargshamn|sveahamn|lanefelt|lexprocura)\.se$', re.I)   # de två sista för test, nämns inte i formuläret
