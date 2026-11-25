@@ -46,6 +46,25 @@
   .sub p { margin:0 0 12px; font-size:13px; color:var(--muted); line-height:1.45; }
   .subf { height:190px; } @media (max-width:520px) { .subf { height:270px; } }
   header .subl { color:#fff; font-size:12px; border:1px solid #2BA8E0; border-radius:4px; padding:5px 9px; text-decoration:none; white-space:nowrap; }
+  .dlg { position:fixed; inset:0; background:rgba(7,19,31,.62); display:none; align-items:center; justify-content:center; padding:14px; z-index:2000; }
+  .dlg.on { display:flex; }
+  .shp { background:#fff; border-radius:10px; width:100%; max-width:460px; max-height:92vh; overflow:auto; box-shadow:0 18px 50px rgba(0,0,0,.35); }
+  .shp .hd { background:linear-gradient(135deg,#0E2A47,#0B1F33 60%,#07131F); color:#fff; padding:16px 18px 14px; position:relative; }
+  .shp .hd svg { display:block; width:100%; height:86px; margin:4px 0 10px; }
+  .shp .hd .t1 { font-size:11px; letter-spacing:.16em; color:var(--cyan); font-weight:bold; text-transform:uppercase; }
+  .shp .hd .t2 { font-size:22px; font-weight:bold; margin-top:2px; }
+  .shp .hd .t3 { font-size:13px; color:#B9CCE0; margin-top:3px; }
+  .shp .x { position:absolute; top:10px; right:12px; background:none; border:0; color:#fff; font-size:26px; line-height:1; cursor:pointer; }
+  .shp .bd { padding:14px 18px 18px; }
+  .shp .st { font-size:13px; padding:9px 11px; border-radius:6px; background:var(--bg); margin-bottom:12px; line-height:1.45; }
+  .shp dl { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin:0 0 14px; }
+  .shp dt { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:bold; }
+  .shp dd { margin:2px 0 0; font-size:14px; font-weight:bold; color:var(--navy); }
+  .shp h4 { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--blue); margin:4px 0 6px; }
+  .shp .vis { font-size:13px; line-height:1.5; margin-bottom:14px; }
+  .shp .btn { display:block; text-align:center; background:var(--navy); color:#fff; text-decoration:none; padding:11px; border-radius:6px; font-size:14px; font-weight:bold; }
+  .shp .src { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.4; }
+  table.hist tr.cl { cursor:pointer; } table.hist tr.cl:hover td { background:#E8F4FB; }
   footer { font-size:11px; color:var(--muted); padding:16px 14px 28px; max-width:1100px; margin:0 auto; line-height:1.5; }
   .err { background:#FDF2EC; border-left:4px solid #C2410C; padding:10px 12px; margin-bottom:12px; font-size:13px; display:none; }
   @media (max-width:520px) { header .t2 { font-size:18px; } .top img { height:44px; } .stat .n { font-size:22px; } }
@@ -76,6 +95,7 @@
     <iframe class="subf" src="https://form.jotform.com/263273393605056" title="Prenumerera på fartygslistan" style="width:100%;border:0;display:block"></iframe>
   </div>
 </main>
+<div class="dlg" id="dlg" onclick="if(event.target===this)closeShip()"><div class="shp" id="shp" role="dialog" aria-modal="true"></div></div>
 <footer>
   Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. Karta: © OpenStreetMap-bidragsgivare, sjömärken © OpenSeaMap.<br>
   <span id="logstart"></span>Positionerna kommer från fartygens AIS-sändare och kan vara fördröjda eller saknas. "På väg till Hargshamn" bygger på den destination besättningen själv har angett. Listorna visar last- och tankfartyg. Färjor och mindre båtar visas bara på kartan.
@@ -103,7 +123,7 @@ async function loadLog() {
   const el = document.getElementById('hist');
   if (!HIST.length) { el.innerHTML = '<div class="empty">Inga avslutade anlöp loggade ännu.</div>'; return; }
   el.innerHTML = '<table class="hist"><tr><th>Fartyg</th><th>Ankom</th><th>Avgick</th><th>Vid kaj</th><th>Väntan på redden</th></tr>'
-    + HIST.slice(0,20).map(a => '<tr><td><b>'+a.name+'</b></td><td>'+(a.before_log?'Före loggstart':fmt(a.arrival))+'</td><td>'+fmt(a.departure)+'</td><td class="n">'+dur(a.hours_at_quay)+'</td><td class="n">'+(a.hours_waiting?dur(a.hours_waiting):'')+'</td></tr>').join('')
+    + HIST.slice(0,20).map(a => '<tr class="cl" onclick="openShip('+a.mmsi+')"><td><b>'+a.name+'</b></td><td>'+(a.before_log?'Före loggstart':fmt(a.arrival))+'</td><td>'+fmt(a.departure)+'</td><td class="n">'+dur(a.hours_at_quay)+'</td><td class="n">'+(a.hours_waiting?dur(a.hours_waiting):'')+'</td></tr>').join('')
     + '</table>';
 }
 function logLine(mmsi, kind) {
@@ -113,6 +133,63 @@ function logLine(mmsi, kind) {
   if (kind==='r') return s.anchor_start ? 'Ligger still sedan <b>'+fmt(s.anchor_start)+'</b> · '+dur(since(s.anchor_start)) : '';
   return '';
 }
+
+// ---------- faktakort per fartyg ----------
+const POS = {};
+const MID = {201:'AL',203:'AT',205:'BE',207:'BG',209:'CY',210:'CY',211:'DE',212:'CY',215:'MT',218:'DE',219:'DK',220:'DK',224:'ES',225:'ES',226:'FR',227:'FR',228:'FR',229:'MT',230:'FI',231:'FO',232:'GB',233:'GB',234:'GB',235:'GB',236:'GI',237:'GR',238:'HR',239:'GR',240:'GR',241:'GR',244:'NL',245:'NL',246:'NL',247:'IT',248:'MT',249:'MT',250:'IE',251:'IS',253:'LU',255:'PT',256:'MT',257:'NO',258:'NO',259:'NO',261:'PL',263:'PT',264:'RO',265:'SE',266:'SE',267:'SK',271:'TR',272:'UA',273:'RU',275:'LV',276:'EE',277:'LT',278:'SI',304:'AG',305:'AG',308:'BS',309:'BS',310:'BM',311:'BS',314:'BB',319:'KY',341:'KN',351:'PA',352:'PA',353:'PA',354:'PA',355:'PA',356:'PA',357:'PA',370:'PA',371:'PA',372:'PA',373:'PA',375:'VC',376:'VC',377:'VC',412:'CN',413:'CN',414:'CN',431:'JP',432:'JP',440:'KR',441:'KR',477:'HK',518:'CK',538:'MH',563:'SG',564:'SG',565:'SG',566:'SG',572:'TV',636:'LR',637:'LR',667:'SL',677:'TZ'};
+const regionName = (() => { try { const d = new Intl.DisplayNames(['sv'], { type:'region' }); return c => d.of(c); } catch(e) { return c => c; } })();
+const flagOf = mmsi => { const c = MID[String(mmsi).slice(0,3)]; return c ? { code:c, name:regionName(c), emoji:String.fromCodePoint(...[...c].map(x => 127397 + x.charCodeAt(0))) } : null; };
+const TYPELONG = t => t>=70&&t<80?'Lastfartyg':t>=80&&t<90?'Tankfartyg':t>=60&&t<70?'Passagerarfartyg':t===52?'Bogserbåt':t===50?'Lotsbåt':t===30?'Fiskefartyg':'Fartyg';
+const esc = x => String(x==null?'':x).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const num = (x, d=0) => x.toFixed(d).replace('.', ',');
+function shipSvg(t) {
+  const tank = t>=80 && t<90;
+  const deck = tank
+    ? '<rect x="70" y="34" width="190" height="8" rx="2" fill="#2BA8E0"/><circle cx="110" cy="30" r="5" fill="#2BA8E0"/><circle cx="160" cy="30" r="5" fill="#2BA8E0"/><circle cx="210" cy="30" r="5" fill="#2BA8E0"/>'
+    : '<rect x="70" y="18" width="40" height="24" rx="2" fill="#0A629E"/><rect x="114" y="22" width="40" height="20" rx="2" fill="#2BA8E0"/><rect x="158" y="14" width="40" height="28" rx="2" fill="#0A629E"/><rect x="202" y="24" width="40" height="18" rx="2" fill="#2BA8E0"/>';
+  return '<svg viewBox="0 0 340 86" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
+    + '<path d="M10 72 Q85 64 170 72 T330 72" stroke="#2BA8E0" stroke-opacity=".35" stroke-width="3" fill="none"/>'
+    + '<path d="M20 42 L320 42 L300 66 L40 66 Z" fill="#fff"/>'
+    + '<path d="M40 66 L300 66 L296 71 L44 71 Z" fill="#C2410C" opacity=".85"/>'
+    + '<rect x="262" y="8" width="34" height="34" rx="3" fill="#fff"/><rect x="266" y="13" width="26" height="6" rx="1" fill="#0B1F33"/>'
+    + '<rect x="276" y="0" width="6" height="9" fill="#fff"/>' + deck + '</svg>';
+}
+async function openShip(mmsi, p) {
+  const box = document.getElementById('shp'), dlg = document.getElementById('dlg');
+  p = p || POS[mmsi];
+  box.innerHTML = '<div class="hd"><button class="x" onclick="closeShip()" aria-label="Stäng">×</button><div class="t2">Hämtar …</div></div>';
+  dlg.classList.add('on');
+  const v = await vessel(mmsi);
+  const f = flagOf(mmsi), L_ = (v.referencePointA||0)+(v.referencePointB||0), B_ = (v.referencePointC||0)+(v.referencePointD||0);
+  const s = (LOG.ships||{})[String(mmsi)];
+  let st = '';
+  if (s && s.before_log) st = '<b>Vid kaj</b> sedan före loggstart.';
+  else if (s && s.arrival) st = '<b>Vid kaj</b> sedan '+fmt(s.arrival)+', '+dur(since(s.arrival))+(s.anchor_start ? '. Väntade '+dur((new Date(s.arrival)-new Date(s.anchor_start))/3600000)+' på redden.' : '.');
+  else if (s && s.anchor_start) st = '<b>Ligger still i närheten</b> sedan '+fmt(s.anchor_start)+', '+dur(since(s.anchor_start))+'.';
+  else if (DEST.test(v.destination||'')) st = '<b>På väg till Hargshamn.</b>'+(eta(v.eta) ? ' Beräknad ankomst '+eta(v.eta)+'.' : '');
+  const visits = HIST.filter(a => String(a.mmsi)===String(mmsi));
+  const rows = [
+    ['Fartygstyp', TYPELONG(v.shipType)], ['Flagga', f ? f.emoji+' '+f.name : '–'],
+    ['Längd', L_ ? num(L_)+' m' : '–'], ['Bredd', B_ ? num(B_)+' m' : '–'],
+    ['Djupgående nu', v.draught ? num(v.draught/10,1)+' m' : '–'], ['Status', p ? (NAV[p.navStat]||'–') : '–'],
+    ['Fart', p && p.sog!=null ? num(p.sog,1)+' knop' : '–'], ['Destination', v.destination || '–'],
+    ['IMO', v.imo || '–'], ['Anropssignal', v.callSign || '–'], ['MMSI', mmsi], ['Position', p ? ago(p.timestampExternal) : '–']];
+  const vf = v.imo ? 'https://www.vesselfinder.com/vessels/details/'+v.imo : 'https://www.vesselfinder.com/vessels/details/'+mmsi;
+  box.innerHTML = '<div class="hd"><button class="x" onclick="closeShip()" aria-label="Stäng">×</button>'
+    + shipSvg(v.shipType)
+    + '<div class="t1">'+esc(TYPELONG(v.shipType))+(f ? ' · '+f.emoji+' '+esc(f.name) : '')+'</div>'
+    + '<div class="t2">'+esc(v.name || ('MMSI '+mmsi))+'</div>'
+    + '<div class="t3">'+(L_ ? num(L_)+' × '+num(B_)+' m' : '')+(v.imo ? ' · IMO '+v.imo : '')+'</div></div>'
+    + '<div class="bd">' + (st ? '<div class="st">'+st+'</div>' : '')
+    + '<dl>'+rows.map(([k,x]) => '<div><dt>'+k+'</dt><dd>'+esc(x)+'</dd></div>').join('')+'</dl>'
+    + '<h4>Anlöp i Hargshamn</h4><div class="vis">'
+    + (visits.length ? visits.length+' avslutade anlöp sedan loggstart. Senast: ankom '+(visits[0].before_log ? 'före loggstart' : fmt(visits[0].arrival))+', avgick '+fmt(visits[0].departure)+', '+dur(visits[0].hours_at_quay)+' vid kaj.'
+       : 'Inga avslutade anlöp loggade sedan '+(LOG.started ? fmt(LOG.started) : 'loggstart')+'.')
+    + '</div><a class="btn" href="'+vf+'" target="_blank" rel="noopener">Se bilder och mer på VesselFinder</a>'
+    + '<div class="src">Uppgifterna kommer från fartygets AIS-sändare via Fintraffic och kan vara ofullständiga. Längd och bredd räknas fram ur sändarens mått. Flaggan räknas fram ur MMSI-numret.</div></div>';
+}
+function closeShip() { document.getElementById('dlg').classList.remove('on'); }
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeShip(); });
 
 const map = L.map('map', { zoomControl:true }).setView([60.19, 18.50], 11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:18, attribution:'© OpenStreetMap' }).addTo(map);
@@ -142,7 +219,7 @@ function card(v, p, dist, extra, kind) {
     +(NAV[p.navStat]||'')+(v.destination?' · Destination '+v.destination:'')+'</div></div>'
     +'<div class="right"><b>'+(p.sog!=null?p.sog.toFixed(1)+' knop':'')+'</b><br>'+(extra||dist.toFixed(1)+' km från kaj')+'<br>'+ago(p.timestampExternal)+'</div>';
   const ll = logLine(p.mmsi, kind); if (ll) d.innerHTML += '<div class="log">'+ll+'</div>';
-  d.onclick = () => map.setView([p.lat,p.lon], 13);
+  d.onclick = () => { map.setView([p.lat,p.lon], 13); openShip(p.mmsi, p); };
   return d;
 }
 async function load() {
@@ -154,7 +231,7 @@ async function load() {
     const all = await (await fetch(API+'/vessels?from='+since, HDR)).json();
     all.forEach(v => { names[v.mmsi] = v; });
     const heading = all.filter(v => DEST.test(v.destination||'') && !near.some(p => p.mmsi===v.mmsi));
-    const far = await Promise.all(heading.map(async v => { try { const f = await (await fetch(API+'/locations/'+v.mmsi, HDR)).json();
+    const far = await Promise.all(heading.map(async v => { try { const f = (await (await fetch(API+'/locations?mmsi='+v.mmsi, HDR)).json()).features[0];
       return { ...f.properties, lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1] }; } catch(e) { return null; } }));
     layer.clearLayers();
     const q=[], s=[], w=[];
@@ -166,12 +243,14 @@ async function load() {
       else if (relevant && still && p.navStat !== 5) { s.push([v,p,dist]); col='#C2410C'; }
       else if (relevant && DEST.test(v.destination||'')) { w.push([v,p,dist]); col='#2BA8E0'; }
       else if (relevant) col='#0A629E';
-      L.marker([p.lat,p.lon], { icon: icon(col, p.heading!==511?p.heading:p.cog, !still) }).addTo(layer)
-        .bindPopup('<b>'+(v.name||p.mmsi)+'</b><br>'+TYPE(v.shipType)+' · '+(NAV[p.navStat]||'')+'<br>'+(p.sog??'')+' knop · '+(v.destination||''));
+      POS[p.mmsi] = p;
+      L.marker([p.lat,p.lon], { icon: icon(col, p.heading!==511?p.heading:p.cog, !still), title: v.name||'' }).addTo(layer)
+        .on('click', () => openShip(p.mmsi, p));
     }
     for (const p of far.filter(Boolean)) {
       const v = names[p.mmsi]; w.push([v,p,km(PORT,[p.lat,p.lon]), 'ETA '+(eta(v.eta)||'saknas')]);
-      L.marker([p.lat,p.lon], { icon: icon('#2BA8E0', p.heading!==511?p.heading:p.cog, true) }).addTo(layer).bindPopup('<b>'+v.name+'</b><br>På väg till Hargshamn');
+      POS[p.mmsi] = p;
+      L.marker([p.lat,p.lon], { icon: icon('#2BA8E0', p.heading!==511?p.heading:p.cog, true), title: v.name||'' }).addTo(layer).on('click', () => openShip(p.mmsi, p));
     }
     const put = (id, arr, empty) => { const el=document.getElementById(id); el.innerHTML='';
       if (!arr.length) { el.innerHTML='<div class="empty">'+empty+'</div>'; return; }
