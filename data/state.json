@@ -1,5 +1,14 @@
 {
  "ships": {
+  "232032735": {
+   "anchor_start": null,
+   "arrival": "2026-11-26T23:20:33Z",
+   "before_log": false,
+   "first_seen": "2026-11-26T23:20:40Z",
+   "imo": 9312717,
+   "name": "CELTIC PIONEER",
+   "shipType": 70
+  },
   "538012110": {
    "anchor_start": null,
    "arrival": null,
