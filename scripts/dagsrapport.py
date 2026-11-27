@@ -346,7 +346,10 @@ def pill(txt, fg, bg):
 
 
 def dir_pill(d):
-    return pill('&#8601;&nbsp;IN', '#2E7D32', '#E3F1E4') if d == 'in' else pill('&#8599;&nbsp;UT', '#0A629E', '#E2EEF7')
+    # samma bredd på IN och UT
+    fg, bg, txt = ('#2E7D32', '#E3F1E4', '&#8601;&nbsp;IN') if d == 'in' else ('#0A629E', '#E2EEF7', '&#8599;&nbsp;UT')
+    return ('<span style="display:inline-block;width:42px;text-align:center;font-size:10px;font-weight:bold;letter-spacing:1px;color:%s;background:%s;'
+            'padding:2px 0;border-radius:3px;white-space:nowrap">%s</span>') % (fg, bg, txt)
 
 
 def kaj_pin(c, prefix):
