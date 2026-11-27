@@ -66,6 +66,26 @@
   .shp .btn { display:block; text-align:center; background:var(--navy); color:#fff; text-decoration:none; padding:11px; border-radius:6px; font-size:14px; font-weight:bold; }
   .shp .src { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.4; }
   table.hist tr.cl { cursor:pointer; } table.hist tr.cl:hover td { background:#E8F4FB; }
+  .lotsrow { font-size:12px; }
+  .badge { display:inline-block; font-size:10px; font-weight:bold; letter-spacing:.06em; padding:2px 6px; border-radius:3px; text-transform:uppercase; }
+  .b-in { background:#E3F1E4; color:#2E7D32; } .b-ut { background:#E2EEF7; color:#0A629E; }
+  .b-st { background:var(--bg); color:var(--muted); } .b-ok { background:#E3F1E4; color:#2E7D32; } .b-pre { background:#FFF4E0; color:#9A5B00; }
+  .wx { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .wxc { background:#fff; border-radius:6px; border:1px solid var(--line); padding:12px 14px; }
+  .wxc .k { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:bold; }
+  .wxc .v { font-size:26px; font-weight:bold; color:var(--navy); margin-top:4px; display:flex; align-items:center; gap:8px; }
+  .wxc .v small { font-size:13px; color:var(--muted); font-weight:normal; }
+  .wxc .s { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.4; }
+  .arr { display:inline-block; width:22px; height:22px; }
+  .fc { display:flex; gap:6px; overflow-x:auto; padding:10px 2px 4px; }
+  .fc div { flex:0 0 58px; background:#fff; border:1px solid var(--line); border-radius:6px; text-align:center; padding:6px 2px; font-size:11px; color:var(--muted); }
+  .fc b { display:block; color:var(--navy); font-size:14px; margin:2px 0; }
+  .fc .hi { border-color:#C2410C; background:#FDF2EC; } .fc .hi b { color:#C2410C; }
+  .fc .day { flex-basis:auto; background:none; border:0; writing-mode:vertical-rl; transform:rotate(180deg); font-weight:bold; color:var(--blue); padding:0; }
+  .warn { background:#FFF4E0; border-left:4px solid #E8A33D; border-radius:4px; padding:9px 12px; font-size:13px; margin:10px 0 0; }
+  .ice { background:#EAF4FB; border-left:4px solid var(--cyan); border-radius:4px; padding:9px 12px; font-size:13px; margin:10px 0 0; line-height:1.45; }
+  .note { font-size:11px; color:var(--muted); margin-top:8px; line-height:1.45; }
+  @media (max-width:720px) { .wx { grid-template-columns:1fr 1fr; } .wx .wxc:last-child { grid-column:1 / -1; } }
   footer { font-size:11px; color:var(--muted); padding:16px 14px 28px; max-width:1100px; margin:0 auto; line-height:1.5; }
   .err { background:#FDF2EC; border-left:4px solid #C2410C; padding:10px 12px; margin-bottom:12px; font-size:13px; display:none; }
   @media (max-width:520px) { header .t2 { font-size:18px; } .top img { height:44px; } .stat .n { font-size:22px; } }
@@ -89,16 +109,27 @@
   <h2><span class="dot" style="background:#2E7D32"></span>Vid kaj i Hargshamn</h2><div id="lq"></div>
   <h2><span class="dot" style="background:#C2410C"></span>Ligger still i närheten, till exempel på redden</h2><div id="lr"></div>
   <h2><span class="dot" style="background:#2BA8E0"></span>På väg till Hargshamn</h2><div id="lw"></div>
+  <h2><span class="dot" style="background:#0A629E"></span>Lotsningar till och från Hargshamn</h2><div id="lots" class="histwrap"></div>
+  <h2 id="vader"><span class="dot" style="background:#2BA8E0"></span>Väder och vatten</h2>
+  <div class="wx">
+    <div class="wxc"><div class="k">Vind i hamnen nu</div><div class="v" id="wxw">–</div><div class="s" id="wxws"></div></div>
+    <div class="wxc"><div class="k">Uppmätt vind, Örskär</div><div class="v" id="wxo">–</div><div class="s" id="wxos"></div></div>
+    <div class="wxc"><div class="k">Vattenstånd, Forsmark</div><div class="v" id="wxs">–</div><div class="s" id="wxss"></div></div>
+  </div>
+  <div class="fc" id="wxfc"></div>
+  <div id="wxwarn"></div>
+  <div class="ice" id="wxice">Hämtar uppgifter om vintersjöfart …</div>
+  <div class="note">Prognos för hamnens position och uppmätt vind och vattenstånd från SMHI (öppna data, CC BY 4.0). Vattenståndet anges relativt årets medelvattenstånd. Rutor markeras orange vid byvind från 14 m/s (kuling). Kranarnas egna vindgränser är inte inlagda. Vintersjöfart: Sjöfartsverkets och Fintraffics isbrytarsystem via digitraffic.fi.</div>
   <h2><span class="dot" style="background:#0B1F33"></span>Senaste anlöp</h2><div id="hist" class="histwrap"></div>
   <div class="sub" id="prenumerera">
     <h3>Få listan med e-post varje morgon</h3>
-    <p>Varje morgon kl. 07 skickas fartygen vid kaj och på redden och senaste dygnets ankomster och avgångar. Öppet för adresser på @hargshamn.se och @sveahamn.se. Hargs Hamn AB är personuppgiftsansvarig, och namn och e-post används bara för utskicket tills du avslutar.</p>
+    <p>Varje morgon kl. 06 skickas fartygen vid kaj, på redden och på väg in, och en tidslinje över senaste dygnets ankomster och avgångar. Öppet för adresser på @hargshamn.se och @sveahamn.se. Hargs Hamn AB är personuppgiftsansvarig, och namn och e-post används bara för utskicket tills du avslutar.</p>
     <iframe class="subf" src="https://form.jotform.com/263273393605056" title="Prenumerera på fartygslistan" style="width:100%;border:0;display:block"></iframe>
   </div>
 </main>
 <div class="dlg" id="dlg" onclick="if(event.target===this)closeShip()"><div class="shp" id="shp" role="dialog" aria-modal="true"></div></div>
 <footer>
-  Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. Karta: © OpenStreetMap-bidragsgivare, sjömärken © OpenSeaMap.<br>
+  Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. Lotsningar: Sjöfartsverkets publika lotsplan (Pilotinfo), planeringsstöd som inte kan läggas till grund för anspråk mot Sjöfartsverket. Väder och vattenstånd: SMHI. Karta: © OpenStreetMap-bidragsgivare, sjömärken © OpenSeaMap.<br>
   <span id="logstart"></span>Positionerna kommer från fartygens AIS-sändare och kan vara fördröjda eller saknas. "På väg till Hargshamn" bygger på den destination besättningen själv har angett. Listorna visar last- och tankfartyg. Färjor och mindre båtar visas bara på kartan.
 </footer>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -112,7 +143,7 @@ const NAV = {0:'Under gång',1:'Ankrad',2:'Ej manöverbar',3:'Begränsad manöve
 const TYPE = t => t>=70&&t<80?'Last':t>=80&&t<90?'Tank':t>=60&&t<70?'Passagerare':t===52?'Bogserbåt':t===50?'Lots':t===30?'Fiske':'Övrigt';
 const big = t => t>=70 && t<90;           // last- och tankfartyg
 const names = {};
-let LOG = { ships:{} }, HIST = [];
+let LOG = { ships:{} }, HIST = [], LOTS = [];
 const tz = { timeZone:'Europe/Stockholm' };
 const fmt = t => t ? new Date(t).toLocaleString('sv-SE', { ...tz, day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
 const dur = h => h==null ? '' : h < 48 ? (Math.round(h*10)/10).toString().replace('.',',')+' tim' : (Math.round(h/24*10)/10).toString().replace('.',',')+' dygn';
@@ -120,6 +151,8 @@ const since = t => (Date.now()-new Date(t).getTime())/3600000;
 async function loadLog() {
   try { LOG = await (await fetch('../data/state.json?t='+Date.now())).json(); } catch(e) { LOG = { ships:{} }; }
   try { HIST = await (await fetch('../data/anlop.json?t='+Date.now())).json(); } catch(e) { HIST = []; }
+  try { LOTS = (await (await fetch('../data/lots.json?t='+Date.now())).json()).calls || []; } catch(e) { LOTS = []; }
+  renderLots();
   if (LOG.started) document.getElementById('logstart').textContent = 'Loggningen av ankomster och avgångar startade '+fmt(LOG.started)+'. ';
   const el = document.getElementById('hist');
   if (!HIST.length) { el.innerHTML = '<div class="empty">Inga avslutade anlöp loggade ännu.</div>'; return; }
@@ -186,9 +219,103 @@ async function openShip(mmsi, p) {
     + '<h4>Anlöp i Hargshamn</h4><div class="vis">'
     + (visits.length ? visits.length+' avslutade anlöp sedan loggstart. Senast: ankom '+(visits[0].before_log ? 'före loggstart' : fmt(visits[0].arrival))+', avgick '+fmt(visits[0].departure)+', '+dur(visits[0].hours_at_quay)+' vid kaj.'
        : 'Inga avslutade anlöp loggade sedan '+(LOG.started ? fmt(LOG.started) : 'loggstart')+'.')
-    + '</div><a class="btn" href="'+vf+'" target="_blank" rel="noopener">Se bilder och mer på VesselFinder</a>'
+    + '</div>' + (lotsFor(v.name).length ? '<h4>Lotsningar</h4><div class="vis">'+lotsFor(v.name).slice(0,4).map(c => (c.dir==='in'?'In':'Ut')+' '+fmt(c.planned)+' · '+esc(c.status)+(c.kaj ? ' · '+esc(kajTxt(c)) : '')+(c.started ? ' · lots ombord '+fmt(c.started)+(c.finished ? '–'+fmt(c.finished) : '') : '')).join('<br>')+'</div>' : '')
+    + '<a class="btn" href="'+vf+'" target="_blank" rel="noopener">Se bilder och mer på VesselFinder</a>'
     + '<div class="src">Uppgifterna kommer från fartygets AIS-sändare via Fintraffic och kan vara ofullständiga. Längd och bredd räknas fram ur sändarens mått. Flaggan räknas fram ur MMSI-numret.</div></div>';
 }
+// ---------- lotsningar (Sjöfartsverkets publika lotsplan) ----------
+const STATUS_CLS = { 'Preliminär':'b-pre', 'Definitiv':'b-st', 'Bekräftad':'b-ok', 'Pågående':'b-ok', 'Avslutad':'b-st' };
+const kajTxt = c => c && c.kaj ? 'kaj '+c.kaj+(c.kajnamn ? ' '+c.kajnamn : '') : '';
+const open_ = c => c.status !== 'Avslutad';
+function lotsFor(name) { const n = String(name||'').trim().toUpperCase(); return LOTS.filter(c => c.name === n); }
+function lotsLine(name, kind) {
+  const cs = lotsFor(name); if (!cs.length) return '';
+  const byT = (a,b) => (a.planned||'').localeCompare(b.planned||'');
+  if (kind === 'q') {
+    const ut = cs.filter(c => c.dir==='ut' && open_(c)).sort(byT)[0];
+    const kaj = kajTxt(ut || cs.filter(c => c.dir==='in').sort(byT).pop());
+    if (!ut) return kaj ? 'Ligger vid '+kaj+' enligt lotsplanen' : '';
+    return 'Avgår enligt lotsplanen <b>'+fmt(ut.planned)+'</b> <span class="badge '+(STATUS_CLS[ut.status]||'b-st')+'">'+ut.status+'</span>'+(kaj ? ' · '+kaj : '');
+  }
+  const inn = cs.filter(c => c.dir==='in' && open_(c)).sort(byT)[0];
+  if (!inn) return '';
+  return 'Lots in beställd <b>'+fmt(inn.planned)+'</b> <span class="badge '+(STATUS_CLS[inn.status]||'b-st')+'">'+inn.status+'</span>'+(inn.kaj ? ' · till '+kajTxt(inn) : '');
+}
+function renderLots() {
+  const el = document.getElementById('lots'); if (!el) return;
+  const now = Date.now();
+  const show = LOTS.filter(c => { const t = new Date(c.planned || c.ordered).getTime(); return open_(c) ? t > now - 12*3600e3 : t > now - 48*3600e3; })
+    .sort((a,b) => (a.planned||'').localeCompare(b.planned||''));
+  if (!show.length) { el.innerHTML = '<div class="empty">'+(LOTS.length ? 'Inga lotsningar till eller från Hargshamn de närmaste dagarna.' : 'Lotsplanen har inte hämtats än.')+'</div>'; return; }
+  el.innerHTML = '<table class="hist"><tr><th>Planerad</th><th></th><th>Fartyg</th><th>Kaj</th><th>Status</th><th>Lots ombord</th></tr>'
+    + show.map(c => '<tr><td>'+fmt(c.planned)+'</td><td><span class="badge '+(c.dir==='in'?'b-in">In':'b-ut">Ut')+'</span></td><td><b>'+esc(c.name)+'</b></td><td>'+(c.kaj ? c.kaj+' '+esc(c.kajnamn||'') : '')
+      +'</td><td><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></td><td>'+(c.started ? fmt(c.started)+(c.finished ? '–'+new Date(c.finished).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'}) : '') : '')+'</td></tr>').join('')
+    + '</table>';
+}
+
+// ---------- väder, vattenstånd och vintersjöfart ----------
+const WX_PT = 'https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/18.489/lat/60.169/data.json';
+const WX_OBS = (p) => 'https://opendata-download-metobs.smhi.se/api/version/latest/parameter/'+p+'/station/108320/period/latest-hour/data.json';
+const SEA = 'https://opendata-download-ocobs.smhi.se/api/version/latest/parameter/12/station/2179/period/latest-day/data.json';
+const WARN = 'https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json';
+const ICE = 'https://meri.digitraffic.fi/api/winter-navigation/v2/locations';
+const DIRS = ['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSV','SV','VSV','V','VNV','NV','NNV'];
+const dirTxt = d => DIRS[Math.round(((d%360)+360)%360/22.5)%16];
+const arrow = d => '<svg class="arr" viewBox="0 0 24 24" style="transform:rotate('+((d+180)%360)+'deg)"><path d="M12 2 L18 20 L12 15 L6 20 Z" fill="#0A629E"/></svg>';
+const SKY = {1:'Klart',2:'Nästan klart',3:'Växlande molnighet',4:'Halvklart',5:'Molnigt',6:'Mulet',7:'Dimma',8:'Lätta regnskurar',9:'Regnskurar',10:'Kraftiga regnskurar',11:'Åskskurar',12:'Lätta byar av snöblandat regn',13:'Byar av snöblandat regn',14:'Kraftiga byar av snöblandat regn',15:'Lätta snöbyar',16:'Snöbyar',17:'Kraftiga snöbyar',18:'Lätt regn',19:'Regn',20:'Kraftigt regn',21:'Åska',22:'Lätt snöblandat regn',23:'Snöblandat regn',24:'Kraftigt snöblandat regn',25:'Lätt snöfall',26:'Snöfall',27:'Ytligt snöfall'};
+const n1 = x => (Math.round(x*10)/10).toString().replace('.',',');
+const GUST_HI = 14;
+async function getJ(u, o) { const r = await fetch(u, o); if (!r.ok) throw new Error(r.status); return r.json(); }
+async function loadWeather() {
+  try {
+    const fc = await getJ(WX_PT);
+    const now = Date.now();
+    const ts = fc.timeSeries.filter(t => new Date(t.time).getTime() > now - 3600e3);
+    const c = ts[0].data;
+    document.getElementById('wxw').innerHTML = arrow(c.wind_from_direction)+n1(c.wind_speed)+' <small>m/s</small>';
+    document.getElementById('wxws').textContent = 'Från '+dirTxt(c.wind_from_direction)+', byar '+n1(c.wind_speed_of_gust)+' m/s · '+n1(c.air_temperature)+' °C · '+(SKY[c.symbol_code]||'')+' (prognos)';
+    let html = '', lastDay = '';
+    ts.filter((t,i) => new Date(t.time).getUTCHours() % 3 === 0).slice(0,17).forEach(t => {
+      const d = new Date(t.time), day = d.toLocaleDateString('sv-SE',{...tz,weekday:'short'});
+      if (day !== lastDay) { html += '<div class="day">'+day+'</div>'; lastDay = day; }
+      const g = t.data.wind_speed_of_gust;
+      html += '<div'+(g >= GUST_HI ? ' class="hi"' : '')+' title="'+(SKY[t.data.symbol_code]||'')+'">'+d.toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'})
+        +arrow(t.data.wind_from_direction)+'<b>'+Math.round(t.data.wind_speed)+' ('+Math.round(g)+')</b>'+Math.round(t.data.air_temperature)+'°</div>';
+    });
+    document.getElementById('wxfc').innerHTML = html;
+  } catch(e) { document.getElementById('wxws').textContent = 'Prognosen kunde inte hämtas just nu.'; }
+  try {
+    const [w, g, d] = await Promise.all([4, 21, 3].map(p => getJ(WX_OBS(p)).then(j => j.value && j.value.slice(-1)[0])));
+    document.getElementById('wxo').innerHTML = (d ? arrow(+d.value) : '')+n1(+w.value)+' <small>m/s</small>';
+    document.getElementById('wxos').textContent = (d ? 'Från '+dirTxt(+d.value)+', ' : '')+(g ? 'byar '+n1(+g.value)+' m/s · ' : '')+'mätt '+new Date(w.date).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'});
+  } catch(e) { document.getElementById('wxos').textContent = 'Mätvärdet kunde inte hämtas just nu.'; }
+  try {
+    const v = (await getJ(SEA)).value || [];
+    const last = v.slice(-1)[0], prev = v.find(x => x.date >= last.date - 6*3600e3);
+    const val = +last.value, diff = prev ? val - +prev.value : 0;
+    document.getElementById('wxs').innerHTML = (val > 0 ? '+' : '')+Math.round(val)+' <small>cm</small>';
+    document.getElementById('wxss').textContent = (val >= 0 ? 'Över' : 'Under')+' medelvattenstånd · '+(Math.abs(diff) < 2 ? 'oförändrat' : diff > 0 ? 'stiger ('+'+'+Math.round(diff)+' cm på 6 tim)' : 'sjunker ('+Math.round(diff)+' cm på 6 tim)')+' · mätt '+new Date(last.date).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'});
+  } catch(e) { document.getElementById('wxss').textContent = 'Vattenståndet kunde inte hämtas just nu.'; }
+  try {
+    const w = await getJ(WARN);
+    const rel = w.filter(x => x.event && x.event.code !== 'WATER_SHORTAGE').flatMap(x => (x.warningAreas||[]).filter(a => /Uppsala|Östhammar|Ålands hav|Bottenhavet|Norra Östersjön|Norra Kvarken/i.test(a.areaName && a.areaName.sv || '')).map(a => ({ e:x.event.sv, a:a.areaName.sv, l:a.warningLevel && a.warningLevel.sv })));
+    document.getElementById('wxwarn').innerHTML = rel.map(r => '<div class="warn"><b>'+esc(r.l||'Varning')+': '+esc(r.e)+'</b> · '+esc(r.a)+'</div>').join('');
+  } catch(e) {}
+  try {
+    const j = await getJ(ICE, HDR);
+    const h = (j.features||[]).find(f => f.properties.locodeList === 'SEHAN');
+    const el = document.getElementById('wxice');
+    if (!h) { el.textContent = 'Inga uppgifter om vintersjöfart för Hargshamn.'; return; }
+    const now = Date.now(), r = h.properties.restrictions || [];
+    const cur = r.find(x => new Date(x.startTime) <= now && (!x.endTime || new Date(x.endTime) > now));
+    const next = r.filter(x => new Date(x.startTime) > now).sort((a,b) => a.startTime.localeCompare(b.startTime))[0];
+    const say = x => { const m = /^([IVAB]+(?:\s*[ABC])?)\s+(\d+)/i.exec(x.textCompilation||''); return m ? 'isbrytarassistans bara för fartyg med isklass '+m[1]+' eller högre och minst '+(+m[2]).toLocaleString('sv-SE')+' dwt' : 'restriktion '+esc(x.textCompilation); };
+    const sus = (h.properties.suspensions||[]).find(x => new Date(x.startTime) <= now && new Date(x.endTime) > now);
+    el.innerHTML = '<b>Vintersjöfart:</b> '+(cur ? 'Trafikrestriktion gäller sedan '+fmt(cur.startTime)+': '+say(cur)+'.' : 'Inga trafikrestriktioner för Hargshamn just nu.')
+      + (next ? ' Nästa: från '+fmt(next.startTime)+', '+say(next)+'.' : '') + (sus ? ' <b>Isbrytarassistansen är tillfälligt inställd.</b>' : '');
+  } catch(e) { document.getElementById('wxice').textContent = 'Uppgifter om vintersjöfart kunde inte hämtas just nu.'; }
+}
+loadWeather(); setInterval(loadWeather, 15*60000);
 function closeShip() { document.getElementById('dlg').classList.remove('on'); }
 document.addEventListener('keydown', e => { if (e.key==='Escape') closeShip(); });
 // prenumerationsrutan får formulärets egen höjd
@@ -223,6 +350,7 @@ function card(v, p, dist, extra, kind) {
     +(NAV[p.navStat]||'')+(v.destination?' · Destination '+v.destination:'')+'</div></div>'
     +'<div class="right"><b>'+(p.sog!=null?p.sog.toFixed(1)+' knop':'')+'</b><br>'+(extra||dist.toFixed(1)+' km från kaj')+'<br>'+ago(p.timestampExternal)+'</div>';
   const ll = logLine(p.mmsi, kind); if (ll) d.innerHTML += '<div class="log">'+ll+'</div>';
+  const lo = lotsLine(v.name, kind); if (lo) d.innerHTML += '<div class="log lotsrow">'+lo+'</div>';
   d.onclick = () => { map.setView([p.lat,p.lon], 13); openShip(p.mmsi, p); };
   return d;
 }
