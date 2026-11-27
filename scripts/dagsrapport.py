@@ -206,6 +206,7 @@ def getj(url, headers=None):
 DIRS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSV', 'SV', 'VSV', 'V', 'VNV', 'NV', 'NNV']
 WARN_AREAS = re.compile(r'Uppsala|Östhammar|Ålands hav|Bottenhavet|Norra Östersjön|Norra Kvarken', re.I)
 GUST_HI = 14
+ODOR = (70, 110)  # östlig vind blåser in över samhället Hargshamn väster om hamnen
 
 
 def weather(now):
@@ -219,6 +220,17 @@ def weather(now):
         day = [x for x in ts if x[0] <= now + timedelta(hours=24)]
         w['gust_max'] = max(day, key=lambda x: x[1].get('wind_speed_of_gust', 0))
         w['temps'] = (min(d['air_temperature'] for _, d in day), max(d['air_temperature'] for _, d in day))
+        per, cur = [], None
+        for t_, d in day:
+            if ODOR[0] <= d.get('wind_from_direction', -1) <= ODOR[1]:
+                if cur and t_ - cur[1] <= timedelta(hours=1):
+                    cur[1] = t_
+                else:
+                    cur = [t_, t_]
+                    per.append(cur)
+            else:
+                cur = None
+        w['odor'] = per
     except Exception as e:
         print('Prognos saknas:', e)
     try:
@@ -281,6 +293,14 @@ def weather_block(w, now):
             txt = '<b style="color:%s">%s Kuling eller mer.</b>' % (ORANGE, txt)
         lo, hi = w['temps']
         rows.append(('Kommande dygn', txt + ' Temperatur %s till %s °C.' % (n1(lo), n1(hi))))
+    if 'odor' in w:
+        if w['odor']:
+            hm = lambda x: x.astimezone(TZ).strftime('%H:%M')
+            txt = '<b style="color:#B91C1C">Risk för lukt mot samhället Hargshamn.</b> Östlig vind (70–110°) väntas %s.' % ', '.join(
+                '%s–%s' % (hm(a), hm(b + timedelta(hours=1))) for a, b in w['odor'])
+        else:
+            txt = 'Ingen östlig vind mot samhället väntas det kommande dygnet.'
+        rows.append(('Lukt', txt))
     if 'sea' in w:
         v, dv = w['sea']
         trend = 'oförändrat' if abs(dv) < 2 else ('stiger' if dv > 0 else 'sjunker')
