@@ -320,6 +320,15 @@ async function loadWeather() {
   } catch(e) { document.getElementById('wxice').textContent = 'Uppgifter om vintersjöfart kunde inte hämtas just nu.'; }
 }
 loadWeather(); setInterval(loadWeather, 15*60000);
+function openPlanned(c) {
+  const box = document.getElementById('shp');
+  box.innerHTML = '<div class="hd"><button class="x" onclick="closeShip()" aria-label="Stäng">×</button>'+shipSvg(70)
+    + '<div class="t1">Enligt lotsplanen</div><div class="t2">'+esc(c.name)+'</div><div class="t3">Lots in '+fmt(c.planned)+(c.kaj ? ' · '+esc(kajTxt(c)) : '')+'</div></div>'
+    + '<div class="bd"><div class="st"><b>På väg till Hargshamn.</b> Lots in är beställd till '+fmt(c.planned)+', status '+esc(c.status).toLowerCase()+'. Fartyget syns inte i AIS-området än, så position, mått och flagga saknas tills det kommer närmare.</div>'
+    + '<a class="btn" href="https://www.vesselfinder.com/vessels?name='+encodeURIComponent(c.name)+'" target="_blank" rel="noopener">Sök bilder och mer på VesselFinder</a>'
+    + '<div class="src">Uppgiften kommer från Sjöfartsverkets publika lotsplan och är planeringsstöd.</div></div>';
+  document.getElementById('dlg').classList.add('on');
+}
 function closeShip() { document.getElementById('dlg').classList.remove('on'); }
 document.addEventListener('keydown', e => { if (e.key==='Escape') closeShip(); });
 // prenumerationsrutan får formulärets egen höjd
@@ -396,7 +405,9 @@ async function load() {
     const seen = new Set([...q, ...s, ...w].map(([v]) => String(v.name||'').trim().toUpperCase()));
     const exp = LOTS.filter(c => c.dir==='in' && open_(c) && !seen.has(c.name)).sort((a,b) => (a.planned||'').localeCompare(b.planned||''));
     if (exp.length) { const el = document.getElementById('lw'); if (!w.length) el.innerHTML = '';
-      exp.forEach(c => { const d = document.createElement('div'); d.className = 'card'; d.style.cursor = 'default';
+      exp.forEach(c => { const d = document.createElement('div'); d.className = 'card';
+        const v = Object.values(names).find(x => String(x.name||'').trim().toUpperCase() === c.name);
+        d.onclick = () => v ? openShip(v.mmsi) : openPlanned(c);
         d.innerHTML = '<div><div class="nm">'+esc(c.name)+'</div><div class="meta"><span class="tag">Lotsplan</span> Lots in beställd, syns inte i AIS-området än</div></div>'
           +'<div class="right"><b>'+fmt(c.planned)+'</b><br>'+(c.kaj ? 'till '+esc(kajTxt(c)) : '')+'<br><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></div>';
         el.appendChild(d); }); }
