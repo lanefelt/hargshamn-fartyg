@@ -93,6 +93,9 @@
   .ice { background:#EAF4FB; border-left:4px solid var(--cyan); border-radius:4px; padding:9px 12px; font-size:13px; margin:10px 0 0; line-height:1.45; }
   .note { font-size:11px; color:var(--muted); margin-top:8px; line-height:1.45; }
   @media (max-width:720px) { .wx { grid-template-columns:1fr 1fr; } .wx .wxc:last-child { grid-column:1 / -1; } }
+  .windc { position:absolute; inset:0; pointer-events:none; z-index:450; }
+  .windb { background:rgba(255,255,255,.92); border-radius:6px; padding:5px 9px 5px 6px; font:bold 12px Arial,Helvetica,sans-serif; color:#0B1F33; box-shadow:0 1px 4px rgba(0,0,0,.25); display:flex; align-items:center; gap:6px; }
+  .windb small { font-weight:normal; color:#52606D; }
   footer { font-size:11px; color:var(--muted); padding:16px 14px 28px; max-width:1100px; margin:0 auto; line-height:1.5; }
   .err { background:#FDF2EC; border-left:4px solid #C2410C; padding:10px 12px; margin-bottom:12px; font-size:13px; display:none; }
   @media (max-width:520px) { header .t2 { font-size:18px; } .top img { height:44px; } .stat .n { font-size:22px; } }
@@ -286,6 +289,7 @@ async function loadWeather() {
     const ts = fc.timeSeries.filter(t => new Date(t.time).getTime() > now - 3600e3);
     const c = ts[0].data;
     document.getElementById('wxw').innerHTML = arrow(c.wind_from_direction)+n1(c.wind_speed)+' <small>m/s</small>';
+    window.__wind = [c.wind_from_direction, c.wind_speed]; if (typeof setWind === 'function' && typeof WIND !== 'undefined') setWind(c.wind_from_direction, c.wind_speed);
     document.getElementById('wxws').textContent = 'Från '+dirTxt(c.wind_from_direction)+', byar '+n1(c.wind_speed_of_gust)+' m/s · '+n1(c.air_temperature)+' °C · '+(SKY[c.symbol_code]||'')+' (prognos)';
     let html = '', lastDay = '';
     const H = 3600e3, odorAt = new Set(ts.filter(t => ODOR(t.data.wind_from_direction)).map(t => new Date(t.time).getTime()));
@@ -363,6 +367,69 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:18, 
 L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { maxZoom:18, attribution:'© OpenSeaMap' }).addTo(map);
 L.circle(PORT, { radius: QUAY_KM*1000, color:'#2E7D32', weight:1, fillOpacity:0.05 }).addTo(map).bindTooltip('Kajerna i Hargshamn');
 const layer = L.layerGroup().addTo(map);
+
+// ---------- vindpartiklar över kartan (riktning och styrka från SMHI:s prognos för hamnen) ----------
+const WIND = { dir:null, ms:0 };
+const windCanvas = document.createElement('canvas'); windCanvas.className = 'windc';
+document.getElementById('map').appendChild(windCanvas);
+const wctx = windCanvas.getContext('2d');
+const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let parts = [];
+function sizeWind() { const m = document.getElementById('map'); const r = window.devicePixelRatio || 1;
+  windCanvas.width = m.clientWidth * r; windCanvas.height = m.clientHeight * r; windCanvas.style.width = m.clientWidth+'px'; windCanvas.style.height = m.clientHeight+'px';
+  wctx.setTransform(r,0,0,r,0,0); parts = []; }
+function spawn(w, h) { return { x:Math.random()*w, y:Math.random()*h, age:Math.floor(Math.random()*120), t:[] }; }
+const TRAIL = 10;
+function windFrame() {
+  const w = windCanvas.clientWidth, h = windCanvas.clientHeight;
+  if (WIND.dir != null && !document.hidden && w) {
+    if (!parts.length) parts = Array.from({ length: Math.round(w*h/3200) }, () => spawn(w, h));
+    wctx.clearRect(0, 0, w, h);
+    const to = (WIND.dir + 180) * Math.PI/180, v = 0.45 + Math.min(WIND.ms, 25) * 0.15;
+    const dx = Math.sin(to)*v, dy = -Math.cos(to)*v;
+    for (const p of parts) {
+      const f = 1 + (p.age % 9)/18;
+      p.t.push([p.x, p.y]); if (p.t.length > TRAIL) p.t.shift();
+      p.x += dx*f; p.y += dy*f; p.age++;
+      if (p.age > 160 || p.x < -20 || p.y < -20 || p.x > w+20 || p.y > h+20) Object.assign(p, spawn(w, h), { age:0 });
+    }
+    // svansen ritas i lager, svagast längst bak
+    wctx.lineCap = 'round'; wctx.lineWidth = 1.3;
+    wctx.strokeStyle = ODOR(WIND.dir) ? '#B91C1C' : '#0B1F33';
+    for (let k = 1; k < TRAIL; k++) {
+      wctx.globalAlpha = 0.38 * k / TRAIL; wctx.beginPath();
+      for (const p of parts) { const a = p.t[k-1], b = p.t[k]; if (a && b) { wctx.moveTo(a[0], a[1]); wctx.lineTo(b[0], b[1]); } }
+      wctx.stroke();
+    }
+    wctx.globalAlpha = 1;
+  }
+  requestAnimationFrame(windFrame);
+}
+const windBadge = L.control({ position:'bottomleft' });
+windBadge.onAdd = () => { const d = L.DomUtil.create('div', 'windb'); d.id = 'windb'; d.style.display = 'none'; return d; };
+windBadge.addTo(map);
+function setWind(dir, ms) {
+  WIND.dir = dir; WIND.ms = ms; if (calm) windStatic();
+  const b = document.getElementById('windb');
+  if (b) { b.style.display = 'flex'; b.innerHTML = arrow(dir)+'<span>'+n1(ms)+' m/s från '+dirTxt(dir)+(ODOR(dir) ? ' <small style="color:#B91C1C">mot samhället</small>' : '')+'<br><small>Vind i hamnen nu, SMHI</small></span>'; }
+}
+sizeWind(); window.addEventListener('resize', sizeWind); map.on('zoomstart movestart', () => wctx.clearRect(0,0,windCanvas.width,windCanvas.height));
+// stilla vindpilar för den som har valt minskade rörelser i telefonen eller datorn
+function windStatic() {
+  const w = windCanvas.clientWidth, h = windCanvas.clientHeight; wctx.clearRect(0,0,w,h);
+  if (WIND.dir == null) return;
+  const to = (WIND.dir + 180) * Math.PI/180, L = 12 + Math.min(WIND.ms, 20);
+  wctx.strokeStyle = 'rgba(10,98,158,0.5)'; wctx.fillStyle = 'rgba(10,98,158,0.5)'; wctx.lineWidth = 1.6;
+  for (let y = 40; y < h; y += 70) for (let x = 40 + ((y/70) % 2) * 35; x < w; x += 70) {
+    const ex = x + Math.sin(to)*L/2, ey = y - Math.cos(to)*L/2, sx = x - Math.sin(to)*L/2, sy = y + Math.cos(to)*L/2;
+    wctx.beginPath(); wctx.moveTo(sx, sy); wctx.lineTo(ex, ey); wctx.stroke();
+    wctx.beginPath(); wctx.moveTo(ex, ey);
+    wctx.lineTo(ex - Math.sin(to - 0.5)*6, ey + Math.cos(to - 0.5)*6); wctx.lineTo(ex - Math.sin(to + 0.5)*6, ey + Math.cos(to + 0.5)*6); wctx.fill();
+  }
+}
+if (calm) { window.addEventListener('resize', () => setTimeout(windStatic, 50)); map.on('zoomend moveend', windStatic); }
+else requestAnimationFrame(windFrame);
+if (window.__wind) setWind(window.__wind[0], window.__wind[1]);
 
 const km = (a,b) => { const R=6371, r=x=>x*Math.PI/180, dLa=r(b[0]-a[0]), dLo=r(b[1]-a[1]);
   const h=Math.sin(dLa/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
