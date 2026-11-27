@@ -513,8 +513,10 @@ async function load() {
       exp.forEach(c => { const d = document.createElement('div'); d.className = 'card';
         const v = Object.values(names).find(x => String(x.name||'').trim().toUpperCase() === c.name);
         d.onclick = () => v ? openShip(v.mmsi) : openPlanned(c);
-        d.innerHTML = '<div><div class="nm">'+esc(c.name)+'</div><div class="meta"><span class="tag">Lotsplan</span> Lots in beställd, syns inte i AIS-området än</div></div>'
-          +'<div class="right"><b>'+fmt(c.planned)+'</b><br>'+(c.kaj ? 'till '+esc(kajTxt(c)) : '')+'<br><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></div>';
+        d.innerHTML = '<div><div class="nm">'+esc(c.name)+'<span class="tag">Lotsplan</span></div><div class="meta">'
+          +(c.kaj ? PIN+'Planerad kaj '+esc(c.kaj)+' '+esc(c.kajnamn||'') : 'Kaj ej angiven i lotsplanen')+'</div></div>'
+          +'<div class="right">Syns inte i<br>AIS-området än</div>'
+          +'<div class="log lotsrow">Lots in beställd <b>'+fmt(c.planned)+'</b> <span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></div>';
         el.appendChild(d); }); }
     document.getElementById('nq').textContent=q.length; document.getElementById('nr').textContent=s.length; document.getElementById('nw').textContent=w.length+exp.length;
     document.getElementById('upd').textContent = 'Uppdaterad '+new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
