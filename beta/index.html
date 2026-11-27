@@ -288,12 +288,11 @@ async function loadWeather() {
     document.getElementById('wxws').textContent = 'Från '+dirTxt(c.wind_from_direction)+', byar '+n1(c.wind_speed_of_gust)+' m/s · '+n1(c.air_temperature)+' °C · '+(SKY[c.symbol_code]||'')+' (prognos)';
     let html = '', lastDay = '';
     const H = 3600e3, odorAt = new Set(ts.filter(t => ODOR(t.data.wind_from_direction)).map(t => new Date(t.time).getTime()));
-    const block = t0 => [0,1,2].some(i => odorAt.has(t0 + i*H));
     ts.filter((t,i) => new Date(t.time).getUTCHours() % 3 === 0).slice(0,17).forEach(t => {
       const d = new Date(t.time), day = d.toLocaleDateString('sv-SE',{...tz,weekday:'short'});
       if (day !== lastDay) { html += '<div class="day">'+day+'</div>'; lastDay = day; }
       const g = t.data.wind_speed_of_gust;
-      const cls = [block(d.getTime()) ? 'odor' : '', g >= GUST_HI ? 'hi' : ''].filter(Boolean).join(' ');
+      const cls = [ODOR(t.data.wind_from_direction) ? 'odor' : '', g >= GUST_HI ? 'hi' : ''].filter(Boolean).join(' ');
       html += '<div'+(cls ? ' class="'+cls+'"' : '')+' title="'+(SKY[t.data.symbol_code]||'')+'">'+d.toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'})
         +arrow(t.data.wind_from_direction)+'<b>'+Math.round(t.data.wind_speed)+' ('+Math.round(g)+')</b>'+Math.round(t.data.air_temperature)+'°</div>';
     });
