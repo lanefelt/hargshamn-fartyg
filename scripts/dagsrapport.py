@@ -197,21 +197,164 @@ def timeline(events, now):
     return '<div style="background:#ffffff;border-radius:8px;padding:14px 16px 4px">%s</div>' % out
 
 
-def build(now, ships, anlop, coming):
+def getj(url, headers=None):
+    req = urllib.request.Request(url, headers={'User-Agent': 'HargsHamnKMA/1.0', **(headers or {})})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+DIRS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSV', 'SV', 'VSV', 'V', 'VNV', 'NV', 'NNV']
+WARN_AREAS = re.compile(r'Uppsala|Östhammar|Ålands hav|Bottenhavet|Norra Östersjön|Norra Kvarken', re.I)
+GUST_HI = 14
+
+
+def weather(now):
+    """Väder, vattenstånd, varningar och vintersjöfart. Det som inte går att hämta utelämnas."""
+    w = {}
+    try:
+        fc = getj('https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/18.489/lat/60.169/data.json')
+        ts = [(datetime.strptime(x['time'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc), x['data']) for x in fc['timeSeries']]
+        ts = [x for x in ts if x[0] > now - timedelta(hours=1)]
+        w['now'] = ts[0][1]
+        day = [x for x in ts if x[0] <= now + timedelta(hours=24)]
+        w['gust_max'] = max(day, key=lambda x: x[1].get('wind_speed_of_gust', 0))
+        w['temps'] = (min(d['air_temperature'] for _, d in day), max(d['air_temperature'] for _, d in day))
+    except Exception as e:
+        print('Prognos saknas:', e)
+    try:
+        v = getj('https://opendata-download-ocobs.smhi.se/api/version/latest/parameter/12/station/2179/period/latest-day/data.json').get('value') or []
+        if v:
+            last = v[-1]
+            prev = next((x for x in v if x['date'] >= last['date'] - 6 * 3600e3), None)
+            w['sea'] = (float(last['value']), float(last['value']) - float(prev['value']) if prev else 0)
+    except Exception as e:
+        print('Vattenstånd saknas:', e)
+    try:
+        out = []
+        for x in getj('https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json'):
+            if (x.get('event') or {}).get('code') == 'WATER_SHORTAGE':
+                continue
+            for a in x.get('warningAreas') or []:
+                name = (a.get('areaName') or {}).get('sv') or ''
+                if WARN_AREAS.search(name):
+                    out.append('%s: %s, %s' % (((a.get('warningLevel') or {}).get('sv') or 'Varning'), x['event']['sv'], name))
+        w['warn'] = out
+    except Exception as e:
+        print('Varningar saknas:', e)
+    try:
+        j = getj('https://meri.digitraffic.fi/api/winter-navigation/v2/locations', {'Digitraffic-User': 'HargsHamnKMA/1.0'})
+        h = next((f['properties'] for f in j.get('features', []) if f['properties'].get('locodeList') == 'SEHAN'), None)
+        if h is not None:
+            def p(x):
+                return datetime.fromisoformat(x).astimezone(timezone.utc) if x else None
+            r = h.get('restrictions') or []
+            cur = next((x for x in r if p(x['startTime']) <= now and (not x.get('endTime') or p(x['endTime']) > now)), None)
+            nxt = sorted([x for x in r if p(x['startTime']) > now], key=lambda x: x['startTime'])
+            w['ice'] = (cur, nxt[0] if nxt else None, p)
+    except Exception as e:
+        print('Vintersjöfart saknas:', e)
+    return w
+
+
+def ice_txt(x):
+    m = re.match(r'^([IVAB]+(?:\s*[ABC])?)\s+(\d+)', x.get('textCompilation') or '', re.I)
+    if m:
+        return 'isbrytarassistans bara för fartyg med isklass %s eller högre och minst %s dwt' % (m.group(1), '{:,}'.format(int(m.group(2))).replace(',', ' '))
+    return 'restriktion ' + (x.get('textCompilation') or '')
+
+
+def n1(x):
+    return ('%.1f' % x).replace('.', ',')
+
+
+def weather_block(w, now):
+    rows = []
+    if 'now' in w:
+        d = w['now']
+        rows.append(('Vind i hamnen', '%s m/s från %s, byar %s m/s. %s °C.' % (
+            n1(d['wind_speed']), DIRS[round((d['wind_from_direction'] % 360) / 22.5) % 16], n1(d['wind_speed_of_gust']), n1(d['air_temperature']))))
+    if 'gust_max' in w:
+        t_, d = w['gust_max']
+        g = d['wind_speed_of_gust']
+        txt = 'Starkaste byarna %s m/s kl. %s.' % (n1(g), t_.astimezone(TZ).strftime('%H:%M'))
+        if g >= GUST_HI:
+            txt = '<b style="color:%s">%s Kuling eller mer.</b>' % (ORANGE, txt)
+        lo, hi = w['temps']
+        rows.append(('Kommande dygn', txt + ' Temperatur %s till %s °C.' % (n1(lo), n1(hi))))
+    if 'sea' in w:
+        v, dv = w['sea']
+        trend = 'oförändrat' if abs(dv) < 2 else ('stiger' if dv > 0 else 'sjunker')
+        rows.append(('Vattenstånd', '%s%d cm mot medelvattenstånd i Forsmark, %s.' % ('+' if v > 0 else '', round(v), trend)))
+    if 'ice' in w:
+        cur, nxt, p = w['ice']
+        txt = ('Restriktion sedan %s: %s.' % (p(cur['startTime']).astimezone(TZ).strftime('%-d/%-m'), ice_txt(cur))) if cur else 'Inga trafikrestriktioner för Hargshamn.'
+        if nxt:
+            txt += ' Från %s: %s.' % (p(nxt['startTime']).astimezone(TZ).strftime('%-d/%-m'), ice_txt(nxt))
+        rows.append(('Vintersjöfart', txt))
+    if not rows and not w.get('warn'):
+        return empty('Väderuppgifterna kunde inte hämtas i morse.')
+    out = ''.join(
+        '<tr><td valign="top" style="padding:7px 0;border-bottom:1px solid %s;font-size:11px;font-weight:bold;letter-spacing:1px;color:%s;width:110px;font-family:Arial,Helvetica,sans-serif">%s</td>'
+        '<td style="padding:7px 0 7px 8px;border-bottom:1px solid %s;font-size:14px;color:%s;font-family:Arial,Helvetica,sans-serif">%s</td></tr>' % (LINE, MUTED, k.upper(), LINE, INK, v)
+        for k, v in rows)
+    warn = ''.join('<div style="background:#FFF4E0;border-left:4px solid #E8A33D;padding:8px 10px;font-size:13px;margin-top:8px">%s</div>' % x for x in w.get('warn', []))
+    return '<div style="background:#ffffff;border-radius:8px;padding:6px 16px 10px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s</table>%s</div>' % (out, warn)
+
+
+def lots_for(lots, name):
+    n = (name or '').strip().upper()
+    return sorted([c for c in lots if c['name'] == n], key=lambda c: c.get('planned') or '')
+
+
+def kaj_txt(c):
+    return 'kaj %d %s' % (c['kaj'], c.get('kajnamn') or '') if c and c.get('kaj') else ''
+
+
+def status_tag(st):
+    col = {'Bekräftad': GREEN, 'Pågående': GREEN, 'Preliminär': '#9A5B00'}.get(st, MUTED)
+    return '<span style="font-size:10px;font-weight:bold;letter-spacing:1px;color:%s">%s</span>' % (col, (st or '').upper())
+
+
+def lots_table(lots, now):
+    show = sorted([c for c in lots if c.get('status') != 'Avslutad' and c.get('planned')
+                   and now - timedelta(hours=6) < t(c['planned']) < now + timedelta(days=4)], key=lambda c: c['planned'])
+    if not show:
+        return empty('Inga lotsningar till eller från Hargshamn de närmaste dagarna.')
+    rows = ''.join(
+        '<tr><td style="padding:8px 0;border-bottom:1px solid %s;font-size:13px;font-weight:bold;color:%s;white-space:nowrap;font-family:Arial,Helvetica,sans-serif">%s</td>'
+        '<td style="padding:8px 6px;border-bottom:1px solid %s;font-size:11px;font-weight:bold;color:%s;font-family:Arial,Helvetica,sans-serif">%s</td>'
+        '<td style="padding:8px 0;border-bottom:1px solid %s;font-size:13px;color:%s;font-family:Arial,Helvetica,sans-serif"><b>%s</b><br><span style="color:%s;font-size:12px">%s</span></td>'
+        '<td align="right" style="padding:8px 0;border-bottom:1px solid %s">%s</td></tr>' % (
+            LINE, NAVY, fmt(c['planned']), LINE, GREEN if c['dir'] == 'in' else BLUE, 'IN' if c['dir'] == 'in' else 'UT',
+            LINE, INK, c['name'], MUTED, (kaj_txt(c)[:1].upper() + kaj_txt(c)[1:]), LINE, status_tag(c.get('status')))
+        for c in show)
+    return '<div style="background:#ffffff;border-radius:8px;padding:4px 16px 6px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s</table></div>' % rows
+
+
+def build(now, ships, anlop, coming, lots=None, wx=None):
     day = now - timedelta(hours=24)
     quay = [(m, s) for m, s in ships.items() if s.get('arrival') or s.get('before_log')]
     redd = [(m, s) for m, s in ships.items() if s.get('anchor_start') and not s.get('arrival') and not s.get('before_log')]
+    lots, wx = lots or [], wx or {}
+    known = {(s.get('name') or '').strip().upper() for s in ships.values()} | {n.strip().upper() for _, n, _, _ in coming}
+    expected = [c for c in sorted(lots, key=lambda c: c.get('planned') or '')
+                if c['dir'] == 'in' and c.get('status') != 'Avslutad' and c['name'] not in known]
 
     body = head('VID KAJ', GREEN)
     for m, s in sorted(quay, key=lambda x: x[1].get('arrival') or ''):
         lab, size = info(m, s.get('shipType'))
+        ls = lots_for(lots, s['name'])
+        ut = next((c for c in ls if c['dir'] == 'ut' and c.get('status') != 'Avslutad'), None)
+        kaj = kaj_txt(ut or next((c for c in reversed(ls) if c['dir'] == 'in'), None))
+        size = ' · '.join(x for x in (kaj[:1].upper() + kaj[1:], size) if x)
+        dep = ('<b style="color:%s">Avgår %s</b> enligt lotsplanen %s' % (NAVY, fmt(ut['planned']), status_tag(ut.get('status')))) if ut else ''
         if s.get('before_log') or not s.get('arrival'):
-            body += card(lab, GREEN, s['name'], 'Låg vid kaj när loggen startade', size, '&ndash;')
+            body += card(lab, GREEN, s['name'], 'Låg vid kaj när loggen startade', size, '&ndash;', dep)
         else:
             h = (now - t(s['arrival'])).total_seconds() / 3600
             w = logg.hours(s.get('anchor_start'), s['arrival'])
             foot = 'Väntade %s på redden' % dur(w) if w else 'Ingen väntan på redden'
-            body += card(lab, GREEN, s['name'], 'Ankom ' + fmt(s['arrival']), size, dur(h), foot, h / 120)
+            body += card(lab, GREEN, s['name'], 'Ankom ' + fmt(s['arrival']), size, dur(h), foot + ('<br>' + dep if dep else ''), h / 120)
     if not quay:
         body += empty('Inget fartyg vid kaj just nu.')
 
@@ -219,17 +362,27 @@ def build(now, ships, anlop, coming):
     for m, s in sorted(redd, key=lambda x: x[1]['anchor_start']):
         lab, size = info(m, s.get('shipType'))
         h = (now - t(s['anchor_start'])).total_seconds() / 3600
-        body += card(lab, ORANGE, s['name'], 'Ligger still sedan ' + fmt(s['anchor_start']), size, dur(h))
+        inn = next((c for c in lots_for(lots, s['name']) if c['dir'] == 'in' and c.get('status') != 'Avslutad'), None)
+        foot = ('<b style="color:%s">Lots in %s</b>%s %s' % (NAVY, fmt(inn['planned']), (' till ' + kaj_txt(inn)) if inn.get('kaj') else '', status_tag(inn.get('status')))) if inn else ''
+        body += card(lab, ORANGE, s['name'], 'Ligger still sedan ' + fmt(s['anchor_start']), size, dur(h), foot)
     if not redd:
         body += empty('Inga fartyg väntar på redden.')
 
     body += head('PÅ VÄG IN', CYAN)
     for e, name, m, st in coming[:6]:
         lab, size = info(m, st)
+        inn = next((c for c in lots_for(lots, name) if c['dir'] == 'in' and c.get('status') != 'Avslutad'), None)
+        foot = ('<b style="color:%s">Lots in %s</b>%s %s' % (NAVY, fmt(inn['planned']), (' till ' + kaj_txt(inn)) if inn.get('kaj') else '', status_tag(inn.get('status')))) if inn else ''
         body += card(lab, CYAN, name, 'Enligt fartygets egen uppgift', size,
-                     '<span style="font-size:14px">' + ('ETA ' + e.astimezone(TZ).strftime('%-d/%-m %H:%M') if e else 'ETA saknas') + '</span>')
-    if not coming:
+                     '<span style="font-size:14px">' + ('ETA ' + e.astimezone(TZ).strftime('%-d/%-m %H:%M') if e else 'ETA saknas') + '</span>', foot)
+    for c in expected:
+        body += card('Lotsplan', CYAN, c['name'], 'Lots in beställd' + (', till ' + kaj_txt(c) if c.get('kaj') else ''),
+                     'Syns inte i AIS-området än', '<span style="font-size:14px">' + fmt(c['planned']) + '</span>', status_tag(c.get('status')))
+    if not coming and not expected:
         body += empty('Inget fartyg har angett Hargshamn som destination.')
+
+    body += head('LOTSPLAN', BLUE) + lots_table(lots, now)
+    body += head('VÄDER OCH VATTEN', CYAN) + weather_block(wx, now)
 
     ev = []
     for m, s in ships.items():
@@ -251,11 +404,18 @@ def build(now, ships, anlop, coming):
     body += ('<div style="margin:20px 0 8px"><a href="%s" style="display:block;background:%s;color:#ffffff;text-decoration:none;text-align:center;'
              'font-weight:bold;font-size:15px;padding:13px;border-radius:6px;font-family:Arial,Helvetica,sans-serif">Öppna kartan och hela listan</a></div>') % (PAGE, NAVY)
     body += ('<div style="font-size:11px;color:%s;padding:8px 4px 4px;line-height:1.5">Källa: Fintraffic, digitraffic.fi, AIS-data under licensen CC BY 4.0. '
-             'Tiderna är svensk tid och bygger på fartygens AIS-sändare.<br><a href="%s" style="color:%s">Avsluta eller ändra prenumerationen</a></div>'
+             'Lotsningar: Sjöfartsverkets publika lotsplan, planeringsstöd som inte kan läggas till grund för anspråk mot Sjöfartsverket. '
+             'Väder och vattenstånd: SMHI. Vintersjöfart: Sjöfartsverket och Fintraffic. '
+             'Tiderna är svensk tid.<br><a href="%s" style="color:%s">Avsluta eller ändra prenumerationen</a></div>'
              '<!--ADMIN-->') % (MUTED, FORM_URL, MUTED)
 
     lede = '%s fartyg vid kaj' % (['Inget', 'Ett', 'Två', 'Tre', 'Fyra', 'Fem', 'Sex'][len(quay)] if len(quay) < 7 else len(quay))
     lede += ', %s väntar på redden.' % (['inget', 'ett', 'två', 'tre', 'fyra', 'fem', 'sex'][len(redd)] if len(redd) < 7 else len(redd)) if redd else '.'
+    nxt = sorted([c for c in lots if c.get('status') != 'Avslutad' and c.get('planned') and now < t(c['planned']) < now + timedelta(hours=36)],
+                 key=lambda c: c['planned'])
+    if nxt:
+        c = nxt[0]
+        lede += ' Nästa lotsning: %s %s %s.' % (c['name'], 'in' if c['dir'] == 'in' else 'ut', fmt(c['planned']))
     lokal = now.astimezone(TZ)
     datum_txt = '%s %d %s' % (DAGAR[lokal.weekday()], lokal.day, MAN[lokal.month - 1])
     top = ('<tr><td style="background:%s;border-radius:10px 10px 0 0;padding:22px 20px 20px;font-family:Arial,Helvetica,sans-serif">'
@@ -263,7 +423,7 @@ def build(now, ships, anlop, coming):
            '<div style="font-size:26px;font-weight:bold;margin-top:6px;color:#ffffff">%s</div>'
            '<div style="font-size:14px;color:#B9CCE0;margin-top:4px">%s</div></td></tr>') % (NAVY, CYAN, datum_txt, lede)
     top += ('<tr><td style="background:%s;padding:14px 6px 2px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr>%s%s%s</tr></table></td></tr>') % (
-        BG, stat(len(quay), 'VID KAJ', GREEN), stat(len(redd), 'PÅ REDDEN', ORANGE), stat(len(coming), 'PÅ VÄG', CYAN))
+        BG, stat(len(quay), 'VID KAJ', GREEN), stat(len(redd), 'PÅ REDDEN', ORANGE), stat(len(coming) + len(expected), 'PÅ VÄG', CYAN))
     top += '<tr><td style="background:%s;padding:0 12px 18px;border-radius:0 0 10px 10px;font-family:Arial,Helvetica,sans-serif">%s</td></tr>' % (BG, body)
     html = ('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
             '<body style="margin:0;padding:0;background:#E9EEF3"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#E9EEF3">'
@@ -288,7 +448,8 @@ def main():
     now = datetime.now(timezone.utc)
     state = logg.load('state.json', {'ships': {}})
     ships = state.get('ships', {})
-    html, text = build(now, ships, logg.load('anlop.json', []), on_the_way(ships, now))
+    html, text = build(now, ships, logg.load('anlop.json', []), on_the_way(ships, now),
+                       logg.load('lots.json', {}).get('calls', []), weather(now))
     datum = now.astimezone(TZ).strftime('%Y-%m-%d')
 
     # de fasta mottagarna (MAIL_TO) får också en rad om vilka som får mejlet
