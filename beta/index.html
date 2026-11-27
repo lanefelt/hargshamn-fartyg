@@ -71,6 +71,12 @@
   table.hist tr.cl { cursor:pointer; } table.hist tr.cl:hover td { background:#E8F4FB; }
   .lotsrow { font-size:12px; }
   .lotsrow .badge { display:table; margin-top:4px; }
+  .tag.sx-r { background:#FCEBEB; color:#A32D2D; } .tag.sx-a { background:#FFF4E0; color:#9A5B00; }
+  .card.sxeu { border-left:4px solid #A32D2D; }
+  .card .sxw { grid-column:1 / -1; font-size:12px; padding:7px 9px; border-radius:6px; background:#FCEBEB; color:#791F1F; }
+  .card .sxw.a { background:#FFF4E0; color:#7A4800; }
+  .sxbox { font-size:13px; padding:8px 10px; border-radius:6px; background:var(--bg); margin:4px 0 8px; }
+  .sxbox.r { background:#FCEBEB; color:#791F1F; } .sxbox.a { background:#FFF4E0; color:#7A4800; }
   #lots .lotsub { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:bold; margin:14px 2px 6px; }
   #lots .mob { display:none; font-size:11px; color:var(--muted); font-weight:normal; margin-top:2px; }
   @media (max-width:600px) { #lots .lo, #lots .kn { display:none; } #lots .mob { display:block; } #lots table.hist th, #lots table.hist td { padding:7px 5px; font-size:11.5px; } #lots .badge { font-size:9px; padding:2px 4px; } }
@@ -157,6 +163,35 @@ const PIN = '<svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M1
 const DIRB = d => d==='in'
   ? '<span class="badge dir b-in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7L7 17M16 17H7V8"/></svg>In</span>'
   : '<span class="badge dir b-ut"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg>Ut</span>';
+// ---------- sanktionskontroll (data/sanktion.json, uppdateras av scripts/sanktion.py) ----------
+const SXL = { EU:'EU:s', UK:'Storbritanniens', US:'USA:s (OFAC)' };
+const sxNorm = n => String(n||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+// träff på IMO är säker, träff på bara namnet (när IMO saknas) är möjlig
+function sxFor(name, imo) {
+  if (!SX) return null;
+  imo = /^\d{7}$/.test(String(imo||'')) && String(imo) !== '0000000' ? String(imo) : '';
+  if (imo && SX.imo[imo]) return { sure:true, imo, lists:SX.imo[imo] };
+  const n = sxNorm(name);
+  if (!imo && n && SX.names[n]) return { sure:false, imo:'', lists:Object.fromEntries(SX.names[n].map(k => [k,''])) };
+  return null;
+}
+const sxTags = h => !h ? '' : !h.sure ? '<span class="tag sx-a">Möjlig träff</span>'
+  : Object.keys(h.lists).sort().map(k => '<span class="tag '+(k==='EU'?'sx-r':'sx-a')+'">'+(k==='US'?'USA':k)+'-sanktion</span>').join('');
+function sxText(h) {
+  const ls = Object.keys(h.lists).sort(), who = ls.map(k => SXL[k]).join(' och ');
+  if (!h.sure) return 'Namnet finns på '+who+' sanktionslista. IMO-nummer saknas, så träffen är inte säker. Kontrollera.';
+  if (h.lists.EU) return 'IMO '+h.imo+' finns på EU:s lista över sanktionerade fartyg ('+esc(h.lists.EU)+')'+(/XLII/.test(h.lists.EU) ? '. För de fartygen gäller förbud mot hamnanlöp' : '')+'. Kontrollera innan anlöp.';
+  return 'IMO '+h.imo+' finns på '+who+' sanktionslista. Den binder inte svenska hamnar men kan påverka försäkring och betalningar. Kontrollera.';
+}
+const sxCls = h => h && h.sure && h.lists.EU ? '' : ' a';
+function sxBox(name, imo) {
+  if (!SX) return '<h4>Sanktionskontroll</h4><div class="sxbox">Sanktionslistorna kunde inte läsas just nu.</div>';
+  const h = sxFor(name, imo), src = SX.sources || {}, when = Object.values(src).map(s => s.at).filter(Boolean).sort().pop();
+  const lists = ['EU','UK','US'].filter(k => src[k]).map(k => ({EU:'EU',UK:'Storbritannien',US:'USA (OFAC)'})[k]+(src[k].ok ? '' : ' (kunde inte uppdateras)')).join(', ');
+  return '<h4>Sanktionskontroll</h4><div class="sxbox'+(h ? (h.sure && h.lists.EU ? ' r' : ' a') : '')+'">'
+    + (h ? sxText(h) : 'Ingen träff'+(imo && /^\d{7}$/.test(String(imo)) ? ' på IMO '+imo : ' på namnet, IMO saknas'))
+    + '<br><span style="opacity:.75">'+lists+(when ? ' · listorna hämtade '+fmt(when) : '')+'</span></div>';
+}
 const PORT = [60.1686, 18.4890];         // kajerna i Hargshamn
 const QUAY_KM = 1.2, NEAR_KM = 25;        // kajzon och närområde
 const DEST = /HARG|SEHAN/i;               // destination som besättningen anger (SEHAN = Hargshamn)
@@ -164,7 +199,7 @@ const NAV = {0:'Under gång',1:'Ankrad',2:'Ej manöverbar',3:'Begränsad manöve
 const TYPE = t => t>=70&&t<80?'Lastfartyg':t>=80&&t<90?'Tankfartyg':t>=60&&t<70?'Passagerarfartyg':t===52?'Bogserbåt':t===50?'Lotsbåt':t===30?'Fiskefartyg':'Övrigt';
 const big = t => t>=70 && t<90;           // last- och tankfartyg
 const names = {};
-let LOG = { ships:{} }, HIST = [], LOTS = [];
+let LOG = { ships:{} }, HIST = [], LOTS = [], SX = null;
 const tz = { timeZone:'Europe/Stockholm' };
 // ÅÅ-MM-DD HH:MM i svensk tid
 const fmt = t => { if (!t) return ''; const p = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { ...tz, year:'2-digit', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(new Date(t)).map(x => [x.type, x.value])); return p.year+'-'+p.month+'-'+p.day+' '+p.hour+':'+p.minute; };
@@ -174,6 +209,7 @@ async function loadLog() {
   try { LOG = await (await fetch('../data/state.json?t='+Date.now())).json(); } catch(e) { LOG = { ships:{} }; }
   try { HIST = await (await fetch('../data/anlop.json?t='+Date.now())).json(); } catch(e) { HIST = []; }
   try { LOTS = (await (await fetch('../data/lots.json?t='+Date.now())).json()).calls || []; } catch(e) { LOTS = []; }
+  try { SX = await (await fetch('../data/sanktion.json?t='+Date.now())).json(); } catch(e) { SX = null; }
   renderLots();
   if (LOG.started) document.getElementById('logstart').textContent = 'Loggningen av ankomster och avgångar startade '+fmt(LOG.started)+'. ';
   const el = document.getElementById('hist');
@@ -238,6 +274,7 @@ async function openShip(mmsi, p) {
     + '<div class="t3">'+(L_ ? num(L_)+' × '+num(B_)+' m' : '')+(v.imo ? ' · IMO '+v.imo : '')+'</div></div>'
     + '<div class="bd">' + (st ? '<div class="st">'+st+'</div>' : '')
     + '<dl>'+rows.map(([k,x]) => '<div><dt>'+k+'</dt><dd>'+esc(x)+'</dd></div>').join('')+'</dl>'
+    + sxBox(v.name, v.imo)
     + '<h4>Anlöp i Hargshamn</h4><div class="vis">'
     + (visits.length ? visits.length+' avslutade anlöp sedan loggstart. Senast: ankom '+(visits[0].before_log ? 'före loggstart' : fmt(visits[0].arrival))+', avgick '+fmt(visits[0].departure)+', '+dur(visits[0].hours_at_quay)+' vid kaj.'
        : 'Inga avslutade anlöp loggade sedan '+(LOG.started ? fmt(LOG.started) : 'loggstart')+'.')
@@ -267,7 +304,7 @@ const ombord = c => fmt(c.started)+(c.finished ? '–'+new Date(c.finished).toLo
 function renderLots() {
   const el = document.getElementById('lots'); if (!el) return;
   const now = Date.now(), T = c => new Date(c.planned || c.ordered).getTime();
-  const row = (c, done) => '<tr><td>'+fmt(done ? (c.finished || c.started || c.planned) : c.planned)+'</td><td>'+DIRB(c.dir)+'</td><td><b>'+esc(c.name)+'</b>'+(c.started ? '<div class="mob">Lots ombord '+ombord(c)+'</div>' : '')+'</td><td>'+(c.kaj ? c.kaj+'<span class="kn"> '+esc(c.kajnamn||'')+'</span>' : '')
+  const row = (c, done) => '<tr><td>'+fmt(done ? (c.finished || c.started || c.planned) : c.planned)+'</td><td>'+DIRB(c.dir)+'</td><td><b>'+esc(c.name)+'</b>'+sxTags(sxFor(c.name, (Object.values(names).find(x => sxNorm(x.name) === sxNorm(c.name))||{}).imo))+(c.started ? '<div class="mob">Lots ombord '+ombord(c)+'</div>' : '')+'</td><td>'+(c.kaj ? c.kaj+'<span class="kn"> '+esc(c.kajnamn||'')+'</span>' : '')
       +'</td><td><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></td><td class="lo">'+(c.started ? ombord(c) : '')+'</td></tr>';
   const table = (rows, done) => '<table class="hist"><tr><th>'+(done ? 'Avslutad' : 'Planerad')+'</th><th></th><th>Fartyg</th><th>Kaj</th><th>Status</th><th class="lo">Lots ombord</th></tr>'+rows.map(c => row(c, done)).join('')+'</table>';
   // aktuella: allt som inte är avslutat, äldsta först
@@ -363,6 +400,7 @@ function openPlanned(c) {
   box.innerHTML = '<div class="hd"><button class="x" onclick="closeShip()" aria-label="Stäng">×</button>'+shipSvg(70)
     + '<div class="t1">Enligt lotsplanen</div><div class="t2">'+esc(c.name)+'</div><div class="t3">Lots in '+fmt(c.planned)+(c.kaj ? ' · '+esc(kajTxt(c)) : '')+'</div></div>'
     + '<div class="bd"><div class="st"><b>På väg till Hargshamn.</b> Lots in är beställd till '+fmt(c.planned)+', status '+esc(c.status).toLowerCase()+'. Fartyget syns inte i AIS-området än, så position, mått och flagga saknas tills det kommer närmare.</div>'
+    + sxBox(c.name, '')
     + '<a class="btn" href="https://www.vesselfinder.com/vessels?name='+encodeURIComponent(c.name)+'" target="_blank" rel="noopener">Sök bilder och mer på VesselFinder</a>'
     + '<div class="src">Uppgiften kommer från Sjöfartsverkets publika lotsplan och är planeringsstöd.</div></div>';
   document.getElementById('dlg').classList.add('on');
@@ -473,8 +511,10 @@ function card(v, p, dist, extra, kind) {
     meta = (NAV[p.navStat]||'')+(v.destination ? (NAV[p.navStat] ? ' · ' : '')+'Destination '+esc(cap(v.destination)) : '')
       +(nxt && nxt.kaj ? '<br>'+PIN+'Planerad kaj '+nxt.kaj+' '+esc(nxt.kajnamn||'') : '');
   }
-  d.innerHTML = '<div><div class="nm">'+esc(v.name||('MMSI '+p.mmsi))+'<span class="tag">'+TYPE(v.shipType)+'</span></div><div class="meta">'+meta+'</div></div>'
+  const sx = sxFor(v.name, v.imo); if (sx && sx.sure && sx.lists.EU) d.classList.add('sxeu');
+  d.innerHTML = '<div><div class="nm">'+esc(v.name||('MMSI '+p.mmsi))+'<span class="tag">'+TYPE(v.shipType)+'</span>'+sxTags(sx)+'</div><div class="meta">'+meta+'</div></div>'
     +'<div class="right"><b>'+(p.sog!=null?p.sog.toFixed(1)+' knop':'')+'</b><br>'+(extra||dist.toFixed(1)+' km från kaj')+'<br>'+ago(p.timestampExternal)+'</div>';
+  if (sx) d.innerHTML += '<div class="sxw'+sxCls(sx)+'">'+sxText(sx)+'</div>';
   const ll = logLine(p.mmsi, kind); if (ll) d.innerHTML += '<div class="log">'+ll+'</div>';
   const lo = lotsLine(v.name, kind, v.destination); if (lo) d.innerHTML += '<div class="log lotsrow">'+lo+'</div>';
   d.onclick = () => { map.setView([p.lat,p.lon], 13); openShip(p.mmsi, p); };
@@ -521,9 +561,11 @@ async function load() {
       exp.forEach(c => { const d = document.createElement('div'); d.className = 'card';
         const v = Object.values(names).find(x => String(x.name||'').trim().toUpperCase() === c.name);
         d.onclick = () => v ? openShip(v.mmsi) : openPlanned(c);
-        d.innerHTML = '<div><div class="nm">'+esc(c.name)+'<span class="tag">Lotsplan</span></div><div class="meta">'
+        const sx = sxFor(c.name, v && v.imo); if (sx && sx.sure && sx.lists.EU) d.classList.add('sxeu');
+        d.innerHTML = '<div><div class="nm">'+esc(c.name)+'<span class="tag">Lotsplan</span>'+sxTags(sx)+'</div><div class="meta">'
           +(c.kaj ? PIN+'Planerad kaj '+esc(c.kaj)+' '+esc(c.kajnamn||'') : 'Kaj ej angiven i lotsplanen')+'</div></div>'
           +'<div class="right">Syns inte i<br>AIS-området än</div>'
+          +(sx ? '<div class="sxw'+sxCls(sx)+'">'+sxText(sx)+'</div>' : '')
           +'<div class="log lotsrow">Lots in beställd <b>'+fmt(c.planned)+'</b> <span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></div>';
         el.appendChild(d); }); }
     document.getElementById('nq').textContent=q.length; document.getElementById('nr').textContent=s.length; document.getElementById('nw').textContent=w.length+exp.length;
