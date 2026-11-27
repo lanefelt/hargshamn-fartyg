@@ -67,6 +67,8 @@
   .shp .src { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.4; }
   table.hist tr.cl { cursor:pointer; } table.hist tr.cl:hover td { background:#E8F4FB; }
   .lotsrow { font-size:12px; }
+  #lots .mob { display:none; font-size:11px; color:var(--muted); font-weight:normal; margin-top:2px; }
+  @media (max-width:600px) { #lots .lo, #lots .kn { display:none; } #lots .mob { display:block; } #lots table.hist th, #lots table.hist td { padding:7px 6px; font-size:12px; } #lots .badge { font-size:9px; padding:2px 4px; } }
   .badge { display:inline-block; font-size:10px; font-weight:bold; letter-spacing:.06em; padding:2px 6px; border-radius:3px; text-transform:uppercase; }
   .b-in { background:#E3F1E4; color:#2E7D32; } .b-ut { background:#E2EEF7; color:#0A629E; }
   .b-st { background:var(--bg); color:var(--muted); } .b-ok { background:#E3F1E4; color:#2E7D32; } .b-pre { background:#FFF4E0; color:#9A5B00; }
@@ -242,15 +244,16 @@ function lotsLine(name, kind) {
   if (!inn) return '';
   return 'Lots in beställd <b>'+fmt(inn.planned)+'</b> <span class="badge '+(STATUS_CLS[inn.status]||'b-st')+'">'+inn.status+'</span>'+(inn.kaj ? ' · till '+kajTxt(inn) : '');
 }
+const ombord = c => fmt(c.started)+(c.finished ? '–'+new Date(c.finished).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'}) : '');
 function renderLots() {
   const el = document.getElementById('lots'); if (!el) return;
   const now = Date.now();
   const show = LOTS.filter(c => { const t = new Date(c.planned || c.ordered).getTime(); return open_(c) ? t > now - 12*3600e3 : t > now - 48*3600e3; })
     .sort((a,b) => (a.planned||'').localeCompare(b.planned||''));
   if (!show.length) { el.innerHTML = '<div class="empty">'+(LOTS.length ? 'Inga lotsningar till eller från Hargshamn de närmaste dagarna.' : 'Lotsplanen har inte hämtats än.')+'</div>'; return; }
-  el.innerHTML = '<table class="hist"><tr><th>Planerad</th><th></th><th>Fartyg</th><th>Kaj</th><th>Status</th><th>Lots ombord</th></tr>'
-    + show.map(c => '<tr><td>'+fmt(c.planned)+'</td><td><span class="badge '+(c.dir==='in'?'b-in">In':'b-ut">Ut')+'</span></td><td><b>'+esc(c.name)+'</b></td><td>'+(c.kaj ? c.kaj+' '+esc(c.kajnamn||'') : '')
-      +'</td><td><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></td><td>'+(c.started ? fmt(c.started)+(c.finished ? '–'+new Date(c.finished).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'}) : '') : '')+'</td></tr>').join('')
+  el.innerHTML = '<table class="hist"><tr><th>Planerad</th><th></th><th>Fartyg</th><th>Kaj</th><th>Status</th><th class="lo">Lots ombord</th></tr>'
+    + show.map(c => '<tr><td>'+fmt(c.planned)+'</td><td><span class="badge '+(c.dir==='in'?'b-in">In':'b-ut">Ut')+'</span></td><td><b>'+esc(c.name)+'</b>'+(c.started ? '<div class="mob">Lots ombord '+ombord(c)+'</div>' : '')+'</td><td>'+(c.kaj ? c.kaj+'<span class="kn"> '+esc(c.kajnamn||'')+'</span>' : '')
+      +'</td><td><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></td><td class="lo">'+(c.started ? ombord(c) : '')+'</td></tr>').join('')
     + '</table>';
 }
 
