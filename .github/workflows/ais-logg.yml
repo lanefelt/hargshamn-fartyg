@@ -32,6 +32,16 @@ jobs:
         env:
           JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
         run: python scripts/plan.py
+      - name: Sanktionskontroll
+        continue-on-error: true
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python scripts/sanktion.py
       - name: Spara ändringar
         run: |
           git config user.name "github-actions[bot]"
