@@ -86,6 +86,7 @@
   .fc .arr { display:block; margin:3px auto 0; width:18px; height:18px; }
   .fc .hi { border-color:#C2410C; background:#FDF2EC; } .fc .hi b { color:#C2410C; }
   .fc .odor { border-color:#B91C1C; background:#FDECEC; border-width:2px; } .fc .odor b { color:#B91C1C; }
+  .fc .odorsoon { border:2px dashed #B91C1C; } .fc .os { display:block; font-size:10px; font-weight:bold; color:#B91C1C; margin-top:2px; }
   .warn.odorw { background:#FDECEC; border-left-color:#B91C1C; line-height:1.45; }
   .fc .day { flex-basis:auto; background:none; border:0; writing-mode:vertical-rl; transform:rotate(180deg); font-weight:bold; color:var(--blue); padding:0; }
   .warn { background:#FFF4E0; border-left:4px solid #E8A33D; border-radius:4px; padding:9px 12px; font-size:13px; margin:10px 0 0; }
@@ -126,7 +127,7 @@
   <div id="wxodor"></div>
   <div id="wxwarn"></div>
   <div class="ice" id="wxice">Hämtar uppgifter om vintersjöfart …</div>
-  <div class="note">Prognos för hamnens position och uppmätt vind och vattenstånd från SMHI (öppna data, CC BY 4.0). Vattenståndet anges relativt årets medelvattenstånd. Rutor markeras orange vid byvind från 14 m/s (kuling) och rött vid vind från 70–110 grader, alltså östlig vind mot samhället Hargshamn väster om hamnen (risk för lukt). Kranarnas egna vindgränser är inte inlagda. Vintersjöfart: Sjöfartsverkets och Fintraffics isbrytarsystem via digitraffic.fi.</div>
+  <div class="note">Prognos för hamnens position och uppmätt vind och vattenstånd från SMHI (öppna data, CC BY 4.0). Vattenståndet anges relativt årets medelvattenstånd. Rutor markeras orange vid byvind från 14 m/s (kuling) och rött vid vind från 70–110 grader, alltså östlig vind mot samhället Hargshamn väster om hamnen (risk för lukt). Streckad röd ram betyder att östlig vind väntas senare inom samma tretimmarsperiod, med tiden i rutan. Kranarnas egna vindgränser är inte inlagda. Vintersjöfart: Sjöfartsverkets och Fintraffics isbrytarsystem via digitraffic.fi.</div>
   <h2><span class="dot" style="background:#0B1F33"></span>Senaste anlöp</h2><div id="hist" class="histwrap"></div>
   <div class="sub" id="prenumerera">
     <h3>Få listan med e-post varje morgon</h3>
@@ -292,9 +293,10 @@ async function loadWeather() {
       const d = new Date(t.time), day = d.toLocaleDateString('sv-SE',{...tz,weekday:'short'});
       if (day !== lastDay) { html += '<div class="day">'+day+'</div>'; lastDay = day; }
       const g = t.data.wind_speed_of_gust;
-      const cls = [ODOR(t.data.wind_from_direction) ? 'odor' : '', g >= GUST_HI ? 'hi' : ''].filter(Boolean).join(' ');
+      const own = ODOR(t.data.wind_from_direction), later = own ? 0 : [1,2].find(i => odorAt.has(d.getTime() + i*H));
+      const cls = [own ? 'odor' : later ? 'odorsoon' : '', g >= GUST_HI ? 'hi' : ''].filter(Boolean).join(' ');
       html += '<div'+(cls ? ' class="'+cls+'"' : '')+' title="'+(SKY[t.data.symbol_code]||'')+'">'+d.toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'})
-        +arrow(t.data.wind_from_direction)+'<b>'+Math.round(t.data.wind_speed)+' ('+Math.round(g)+')</b>'+Math.round(t.data.air_temperature)+'°</div>';
+        +arrow(t.data.wind_from_direction)+'<b>'+Math.round(t.data.wind_speed)+' ('+Math.round(g)+')</b>'+Math.round(t.data.air_temperature)+'°'+(later ? '<span class="os">Öst från '+new Date(d.getTime()+later*H).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'})+'</span>' : '')+'</div>';
     });
     document.getElementById('wxfc').innerHTML = html;
     // sammanhängande perioder med östlig vind de närmaste 48 timmarna
