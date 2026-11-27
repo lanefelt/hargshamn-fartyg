@@ -40,6 +40,7 @@
   table.hist { width:100%; border-collapse:collapse; background:#fff; font-size:12.5px; border-radius:6px; overflow:hidden; }
   table.hist th { background:var(--navy); color:#fff; text-align:left; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; padding:8px 10px; }
   table.hist td { padding:8px 10px; border-bottom:1px solid var(--line); }
+  #lots table.hist td:first-child { white-space:nowrap; font-variant-numeric:tabular-nums; }
   table.hist tr:nth-child(even) td { background:var(--bg); }
   table.hist td.n { text-align:right; white-space:nowrap; }
   .histwrap { overflow-x:auto; }
@@ -72,7 +73,7 @@
   .lotsrow .badge { display:table; margin-top:4px; }
   #lots .lotsub { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:bold; margin:14px 2px 6px; }
   #lots .mob { display:none; font-size:11px; color:var(--muted); font-weight:normal; margin-top:2px; }
-  @media (max-width:600px) { #lots .lo, #lots .kn { display:none; } #lots .mob { display:block; } #lots table.hist th, #lots table.hist td { padding:7px 6px; font-size:12px; } #lots .badge { font-size:9px; padding:2px 4px; } }
+  @media (max-width:600px) { #lots .lo, #lots .kn { display:none; } #lots .mob { display:block; } #lots table.hist th, #lots table.hist td { padding:7px 5px; font-size:11.5px; } #lots .badge { font-size:9px; padding:2px 4px; } }
   .badge { display:inline-block; font-size:10px; font-weight:bold; letter-spacing:.06em; padding:2px 6px; border-radius:3px; text-transform:uppercase; }
   .b-in { background:#E3F1E4; color:#2E7D32; } .b-ut { background:#E2EEF7; color:#0A629E; }
   .b-st { background:var(--bg); color:var(--muted); } .b-ok { background:#E3F1E4; color:#2E7D32; } .b-pre { background:#FFF4E0; color:#9A5B00; }
@@ -160,7 +161,8 @@ const big = t => t>=70 && t<90;           // last- och tankfartyg
 const names = {};
 let LOG = { ships:{} }, HIST = [], LOTS = [];
 const tz = { timeZone:'Europe/Stockholm' };
-const fmt = t => t ? new Date(t).toLocaleString('sv-SE', { ...tz, day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+// ÅÅ-MM-DD HH:MM i svensk tid
+const fmt = t => { if (!t) return ''; const p = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { ...tz, year:'2-digit', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(new Date(t)).map(x => [x.type, x.value])); return p.year+'-'+p.month+'-'+p.day+' '+p.hour+':'+p.minute; };
 const dur = h => h==null ? '' : h < 48 ? (Math.round(h*10)/10).toString().replace('.',',')+' tim' : (Math.round(h/24*10)/10).toString().replace('.',',')+' dygn';
 const since = t => (Date.now()-new Date(t).getTime())/3600000;
 async function loadLog() {
