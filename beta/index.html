@@ -378,22 +378,30 @@ let parts = [];
 function sizeWind() { const m = document.getElementById('map'); const r = window.devicePixelRatio || 1;
   windCanvas.width = m.clientWidth * r; windCanvas.height = m.clientHeight * r; windCanvas.style.width = m.clientWidth+'px'; windCanvas.style.height = m.clientHeight+'px';
   wctx.setTransform(r,0,0,r,0,0); parts = []; }
-function spawn(w, h) { return { x:Math.random()*w, y:Math.random()*h, age:Math.floor(Math.random()*80) }; }
+function spawn(w, h) { return { x:Math.random()*w, y:Math.random()*h, age:Math.floor(Math.random()*120), t:[] }; }
+const TRAIL = 18;
 function windFrame() {
   const w = windCanvas.clientWidth, h = windCanvas.clientHeight;
   if (WIND.dir != null && !document.hidden && w) {
-    if (!parts.length) parts = Array.from({ length: Math.round(w*h/2600) }, () => spawn(w, h));
-    wctx.globalCompositeOperation = 'destination-out'; wctx.fillStyle = 'rgba(0,0,0,0.09)'; wctx.fillRect(0,0,w,h);
-    wctx.globalCompositeOperation = 'source-over';
-    const to = (WIND.dir + 180) * Math.PI/180, v = 0.35 + Math.min(WIND.ms, 25) * 0.16;
+    if (!parts.length) parts = Array.from({ length: Math.round(w*h/1300) }, () => spawn(w, h));
+    wctx.clearRect(0, 0, w, h);
+    const to = (WIND.dir + 180) * Math.PI/180, v = 0.6 + Math.min(WIND.ms, 25) * 0.2;
     const dx = Math.sin(to)*v, dy = -Math.cos(to)*v;
-    wctx.strokeStyle = 'rgba(10,98,158,0.55)'; wctx.lineWidth = 1.4; wctx.lineCap = 'round'; wctx.beginPath();
     for (const p of parts) {
-      const nx = p.x + dx*(1 + (p.age % 7)/14), ny = p.y + dy*(1 + (p.age % 7)/14);
-      wctx.moveTo(p.x, p.y); wctx.lineTo(nx, ny); p.x = nx; p.y = ny; p.age++;
-      if (p.age > 90 || p.x < -5 || p.y < -5 || p.x > w+5 || p.y > h+5) Object.assign(p, spawn(w, h), { age:0 });
+      const f = 1 + (p.age % 9)/18;
+      p.t.push([p.x, p.y]); if (p.t.length > TRAIL) p.t.shift();
+      p.x += dx*f; p.y += dy*f; p.age++;
+      if (p.age > 160 || p.x < -20 || p.y < -20 || p.x > w+20 || p.y > h+20) Object.assign(p, spawn(w, h), { age:0 });
     }
-    wctx.stroke();
+    // svansen ritas i lager, svagast längst bak
+    wctx.lineCap = 'round'; wctx.lineWidth = 2.2;
+    wctx.strokeStyle = ODOR(WIND.dir) ? '#B91C1C' : '#0B1F33';
+    for (let k = 1; k < TRAIL; k++) {
+      wctx.globalAlpha = 0.75 * k / TRAIL; wctx.beginPath();
+      for (const p of parts) { const a = p.t[k-1], b = p.t[k]; if (a && b) { wctx.moveTo(a[0], a[1]); wctx.lineTo(b[0], b[1]); } }
+      wctx.stroke();
+    }
+    wctx.globalAlpha = 1;
   }
   requestAnimationFrame(windFrame);
 }
