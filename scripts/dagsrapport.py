@@ -319,14 +319,35 @@ def lots_table(lots, now):
     show = sorted([c for c in lots if c.get('status') != 'Avslutad' and c.get('planned')
                    and now - timedelta(hours=6) < t(c['planned']) < now + timedelta(days=4)], key=lambda c: c['planned'])
     if not show:
-        return empty('Inga lotsningar till eller från Hargshamn de närmaste dagarna.')
+        return empty('Inga beställda lotsningar till eller från Hargshamn de närmaste dagarna.')
+    return lots_rows(show, False)
+
+
+def lots_done(lots, now):
+    """De fem senast avslutade lotsningarna det senaste dygnet, nyast först."""
+    done = [c for c in lots if c.get('status') == 'Avslutad' and (c.get('finished') or c.get('planned'))
+            and t(c.get('finished') or c['planned']) > now - timedelta(hours=24)]
+    done.sort(key=lambda c: c.get('finished') or c['planned'], reverse=True)
+    return lots_rows(done[:5], True) if done else ''
+
+
+def lots_rows(show, done):
+    def when(c):
+        return fmt(c.get('finished') or c.get('started') or c['planned']) if done else fmt(c['planned'])
+
+    def sub(c):
+        k = kaj_txt(c)
+        k = k[:1].upper() + k[1:]
+        if done and c.get('started'):
+            k = ' · '.join(x for x in (k, 'lots ombord ' + fmt(c['started']) + ('–' + t(c['finished']).astimezone(TZ).strftime('%H:%M') if c.get('finished') else '')) if x)
+        return k
     rows = ''.join(
         '<tr><td style="padding:8px 0;border-bottom:1px solid %s;font-size:13px;font-weight:bold;color:%s;white-space:nowrap;font-family:Arial,Helvetica,sans-serif">%s</td>'
         '<td style="padding:8px 6px;border-bottom:1px solid %s;font-size:11px;font-weight:bold;color:%s;font-family:Arial,Helvetica,sans-serif">%s</td>'
         '<td style="padding:8px 0;border-bottom:1px solid %s;font-size:13px;color:%s;font-family:Arial,Helvetica,sans-serif"><b>%s</b><br><span style="color:%s;font-size:12px">%s</span></td>'
         '<td align="right" style="padding:8px 0;border-bottom:1px solid %s">%s</td></tr>' % (
-            LINE, NAVY, fmt(c['planned']), LINE, GREEN if c['dir'] == 'in' else BLUE, 'IN' if c['dir'] == 'in' else 'UT',
-            LINE, INK, c['name'], MUTED, (kaj_txt(c)[:1].upper() + kaj_txt(c)[1:]), LINE, status_tag(c.get('status')))
+            LINE, NAVY, when(c), LINE, GREEN if c['dir'] == 'in' else BLUE, 'IN' if c['dir'] == 'in' else 'UT',
+            LINE, INK, c['name'], MUTED, sub(c), LINE, '' if done else status_tag(c.get('status')))
         for c in show)
     return '<div style="background:#ffffff;border-radius:8px;padding:4px 16px 6px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s</table></div>' % rows
 
@@ -382,6 +403,9 @@ def build(now, ships, anlop, coming, lots=None, wx=None):
         body += empty('Inget fartyg har angett Hargshamn som destination.')
 
     body += head('LOTSPLAN', BLUE) + lots_table(lots, now)
+    done = lots_done(lots, now)
+    if done:
+        body += ('<div style="font-size:11px;font-weight:bold;letter-spacing:2px;color:%s;margin:14px 4px 8px">AVSLUTADE SENASTE DYGNET</div>' % MUTED) + done
     body += head('VÄDER OCH VATTEN', CYAN) + weather_block(wx, now)
 
     ev = []
