@@ -55,7 +55,7 @@ def t(s):
 
 def fmt(s):
     d = t(s)
-    return d.astimezone(TZ).strftime('%-d/%-m %H:%M') if d else ''
+    return d.astimezone(TZ).strftime('%y-%m-%d %H:%M') if d else ''
 
 
 def dur(h):
@@ -66,7 +66,7 @@ def dur(h):
 
 NAVY, CYAN, BLUE, INK, MUTED, LINE, BG = '#0B1F33', '#2BA8E0', '#0A629E', '#1F2933', '#52606D', '#D9E2EC', '#F4F7FA'
 GREEN, ORANGE = '#2E7D32', '#C2410C'
-DEST = re.compile(r'HARG|SEHAN', re.I)
+DEST = re.compile(r'HARG|SE\s*HAN', re.I)
 DAGAR = ['Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag', 'Söndag']
 MAN = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december']
 MID = {209: 'Cypern', 210: 'Cypern', 212: 'Cypern', 211: 'Tyskland', 218: 'Tyskland', 215: 'Malta', 229: 'Malta', 248: 'Malta',
@@ -83,7 +83,14 @@ MID = {209: 'Cypern', 210: 'Cypern', 212: 'Cypern', 211: 'Tyskland', 218: 'Tyskl
 
 def typ(st):
     st = st or 0
-    return 'Last' if 70 <= st < 80 else 'Tank' if 80 <= st < 90 else 'Fartyg'
+    return 'Lastfartyg' if 70 <= st < 80 else 'Tankfartyg' if 80 <= st < 90 else 'Fartyg'
+
+
+def cap(x):
+    return re.sub(r'(^|[\s\-/])(\S)', lambda m: m.group(1) + m.group(2).upper(), (x or '').strip().lower())
+
+
+DESTS = {}
 
 
 def info(mmsi, st=None):
@@ -102,6 +109,7 @@ def info(mmsi, st=None):
         br = (v.get('referencePointC') or 0) + (v.get('referencePointD') or 0)
         if ln and br:
             size = '%d × %d m' % (ln, br)
+        DESTS[str(mmsi)] = v.get('destination') or ''
         if st is None:
             parts[0] = typ(v.get('shipType'))
     except Exception:
@@ -147,21 +155,17 @@ def head(text, c):
     return '<div style="font-size:12px;font-weight:bold;letter-spacing:2px;color:%s;margin:22px 4px 10px">&#9679; %s</div>' % (c, text)
 
 
-def card(label, c, name, left1, left2, right, foot='', prog=None):
-    bar = ''
-    if prog is not None:
-        bar = ('<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="margin-top:10px"><tr>'
-               '<td width="%d%%" style="background:%s;height:6px;font-size:0;line-height:0;border-radius:3px 0 0 3px">&nbsp;</td>'
-               '<td style="background:%s;height:6px;font-size:0;line-height:0">&nbsp;</td></tr></table>') % (max(3, min(100, int(prog * 100))), c, LINE)
-    if foot:
-        bar += '<div style="font-size:12px;color:%s;margin-top:5px">%s</div>' % (MUTED, foot)
-    return ('<div style="background:#ffffff;border-radius:8px;padding:14px 16px;margin:0 0 10px">'
-            '<div style="font-size:11px;font-weight:bold;letter-spacing:1px;color:%s">%s</div>'
-            '<div style="font-size:19px;font-weight:bold;color:%s;margin:2px 0 6px">%s</div>'
-            '<table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr>'
-            '<td style="font-size:13px;color:%s;font-family:Arial,Helvetica,sans-serif">%s<br><span style="color:%s">%s</span></td>'
-            '<td align="right" valign="middle" style="font-size:20px;font-weight:bold;color:%s;white-space:nowrap;font-family:Arial,Helvetica,sans-serif">%s</td>'
-            '</tr></table>%s</div>') % (c, label.upper(), NAVY, name, INK, left1, MUTED, left2, NAVY, right, bar)
+def card(c, name, tag, pin, sub, right='', foot=''):
+    """Fartygskort i samma upplägg som webbsidan: namn och typ, nål med kaj, detaljer och lotsrad."""
+    pin = ('<div style="font-size:13px;color:%s;margin-top:3px">&#128205; %s</div>' % (INK, pin)) if pin else ''
+    sub = ('<div style="font-size:12px;color:%s;margin-top:2px">%s</div>' % (MUTED, sub)) if sub else ''
+    foot = ('<div style="font-size:12px;color:%s;margin-top:8px;padding-top:7px;border-top:1px dashed %s;line-height:1.6">%s</div>' % (INK, LINE, foot)) if foot else ''
+    return ('<div style="background:#ffffff;border-radius:8px;padding:14px 16px;margin:0 0 10px;font-family:Arial,Helvetica,sans-serif">'
+            '<table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr><td valign="top">'
+            '<span style="font-size:17px;font-weight:bold;color:%s">%s</span>'
+            ' <span style="font-size:10px;font-weight:bold;letter-spacing:1px;color:%s;background:#F0F4F8;padding:2px 6px;border-radius:3px;vertical-align:2px">%s</span>'
+            '%s%s</td><td align="right" valign="top" style="font-size:15px;font-weight:bold;color:%s;white-space:nowrap;padding-left:8px">%s</td></tr></table>%s</div>'
+            ) % (NAVY, name, c, tag.upper(), pin, sub, NAVY, right, foot)
 
 
 def empty(text):
@@ -307,9 +311,9 @@ def weather_block(w, now):
         rows.append(('Vattenstånd', '%s%d cm mot medelvattenstånd i Forsmark, %s.' % ('+' if v > 0 else '', round(v), trend)))
     if 'ice' in w:
         cur, nxt, p = w['ice']
-        txt = ('Restriktion sedan %s: %s.' % (p(cur['startTime']).astimezone(TZ).strftime('%-d/%-m'), ice_txt(cur))) if cur else 'Inga trafikrestriktioner för Hargshamn.'
+        txt = ('Restriktion sedan %s: %s.' % (p(cur['startTime']).astimezone(TZ).strftime('%y-%m-%d'), ice_txt(cur))) if cur else 'Inga trafikrestriktioner för Hargshamn.'
         if nxt:
-            txt += ' Från %s: %s.' % (p(nxt['startTime']).astimezone(TZ).strftime('%-d/%-m'), ice_txt(nxt))
+            txt += ' Från %s: %s.' % (p(nxt['startTime']).astimezone(TZ).strftime('%y-%m-%d'), ice_txt(nxt))
         rows.append(('Vintersjöfart', txt))
     if not rows and not w.get('warn'):
         return empty('Väderuppgifterna kunde inte hämtas i morse.')
@@ -331,8 +335,26 @@ def kaj_txt(c):
 
 
 def status_tag(st):
-    col = {'Bekräftad': GREEN, 'Pågående': GREEN, 'Preliminär': '#9A5B00'}.get(st, MUTED)
-    return '<span style="font-size:10px;font-weight:bold;letter-spacing:1px;color:%s">%s</span>' % (col, (st or '').upper())
+    # samma färger som märkena på webbsidan
+    fg, bg = {'Bekräftad': ('#2E7D32', '#E3F1E4'), 'Pågående': ('#2E7D32', '#E3F1E4'), 'Preliminär': ('#9A5B00', '#FFF4E0')}.get(st, (MUTED, '#F0F4F8'))
+    return pill((st or '').upper(), fg, bg)
+
+
+def pill(txt, fg, bg):
+    return ('<span style="display:inline-block;font-size:10px;font-weight:bold;letter-spacing:1px;color:%s;background:%s;'
+            'padding:2px 6px;border-radius:3px;white-space:nowrap">%s</span>') % (fg, bg, txt)
+
+
+def dir_pill(d):
+    return pill('&#8601;&nbsp;IN', '#2E7D32', '#E3F1E4') if d == 'in' else pill('&#8599;&nbsp;UT', '#0A629E', '#E2EEF7')
+
+
+def kaj_pin(c, prefix):
+    return '%s kaj %d %s' % (prefix, c['kaj'], c.get('kajnamn') or '') if c and c.get('kaj') else ''
+
+
+def lots_in(inn):
+    return ('Lots in beställd <b style="color:%s">%s</b><br>%s' % (NAVY, fmt(inn['planned']), status_tag(inn.get('status')))) if inn else ''
 
 
 def lots_table(lots, now):
@@ -366,10 +388,12 @@ def lots_rows(show, done):
         '<td style="padding:8px 6px;border-bottom:1px solid %s;font-size:11px;font-weight:bold;color:%s;font-family:Arial,Helvetica,sans-serif">%s</td>'
         '<td style="padding:8px 0;border-bottom:1px solid %s;font-size:13px;color:%s;font-family:Arial,Helvetica,sans-serif"><b>%s</b><br><span style="color:%s;font-size:12px">%s</span></td>'
         '<td align="right" style="padding:8px 0;border-bottom:1px solid %s">%s</td></tr>' % (
-            LINE, NAVY, when(c), LINE, GREEN if c['dir'] == 'in' else BLUE, 'IN' if c['dir'] == 'in' else 'UT',
-            LINE, INK, c['name'], MUTED, sub(c), LINE, '' if done else status_tag(c.get('status')))
+            LINE, NAVY, when(c), LINE, GREEN if c['dir'] == 'in' else BLUE, dir_pill(c['dir']),
+            LINE, INK, c['name'], MUTED, sub(c), LINE, status_tag(c.get('status')))
         for c in show)
-    return '<div style="background:#ffffff;border-radius:8px;padding:4px 16px 6px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s</table></div>' % rows
+    th = '<td style="padding:8px 0 6px;border-bottom:2px solid %s;font-size:10px;font-weight:bold;letter-spacing:1px;color:%s;font-family:Arial,Helvetica,sans-serif"%s>%s</td>'
+    hdr = '<tr>' + ''.join(th % (NAVY, MUTED, a, x) for x, a in (('AVSLUTAD' if done else 'PLANERAD', ''), ('', ''), ('FARTYG OCH KAJ', ''), ('STATUS', ' align="right"'))) + '</tr>'
+    return '<div style="background:#ffffff;border-radius:8px;padding:4px 16px 6px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s%s</table></div>' % (hdr, rows)
 
 
 def build(now, ships, anlop, coming, lots=None, wx=None):
@@ -384,41 +408,49 @@ def build(now, ships, anlop, coming, lots=None, wx=None):
     body = head('VID KAJ', GREEN)
     for m, s in sorted(quay, key=lambda x: x[1].get('arrival') or ''):
         lab, size = info(m, s.get('shipType'))
+        typ_, *rest = lab.split(' · ')
         ls = lots_for(lots, s['name'])
         ut = next((c for c in ls if c['dir'] == 'ut' and c.get('status') != 'Avslutad'), None)
-        kaj = kaj_txt(ut or next((c for c in reversed(ls) if c['dir'] == 'in'), None))
-        size = ' · '.join(x for x in (kaj[:1].upper() + kaj[1:], size) if x)
-        dep = ('<b style="color:%s">Avgår %s</b> enligt lotsplanen %s' % (NAVY, fmt(ut['planned']), status_tag(ut.get('status')))) if ut else ''
+        k = ut or next((c for c in reversed(ls) if c['dir'] == 'in'), None)
         if s.get('before_log') or not s.get('arrival'):
-            body += card(lab, GREEN, s['name'], 'Låg vid kaj när loggen startade', size, '&ndash;', dep)
+            tid, ank = 'sedan före loggstart', 'Låg vid kaj när loggen startade'
         else:
-            h = (now - t(s['arrival'])).total_seconds() / 3600
             w = logg.hours(s.get('anchor_start'), s['arrival'])
-            foot = 'Väntade %s på redden' % dur(w) if w else 'Ingen väntan på redden'
-            body += card(lab, GREEN, s['name'], 'Ankom ' + fmt(s['arrival']), size, dur(h), foot + ('<br>' + dep if dep else ''), h / 120)
+            tid = dur((now - t(s['arrival'])).total_seconds() / 3600)
+            ank = 'Ankom %s · %s' % (fmt(s['arrival']), ('väntade %s på redden' % dur(w)) if w else 'ingen väntan på redden')
+        pin = ' · '.join(x for x in ((kaj_pin(k, 'Förtöjd vid') or 'Förtöjd vid kaj'), tid) if x)
+        dest = DESTS.get(str(m), '')
+        dep = ('Avgår enligt lotsplanen <b style="color:%s">%s</b>%s<br>%s' % (
+            NAVY, fmt(ut['planned']), (' till <b style="color:%s">%s</b>' % (NAVY, cap(dest))) if dest and not DEST.search(dest) else '',
+            status_tag(ut.get('status')))) if ut else ''
+        body += card(GREEN, s['name'], typ_, pin, ' · '.join(rest + ([size] if size else [])), '', ank + ('<br>' + dep if dep else ''))
     if not quay:
         body += empty('Inget fartyg vid kaj just nu.')
 
     body += head('PÅ REDDEN', ORANGE)
     for m, s in sorted(redd, key=lambda x: x[1]['anchor_start']):
         lab, size = info(m, s.get('shipType'))
+        typ_, *rest = lab.split(' · ')
         h = (now - t(s['anchor_start'])).total_seconds() / 3600
         inn = next((c for c in lots_for(lots, s['name']) if c['dir'] == 'in' and c.get('status') != 'Avslutad'), None)
-        foot = ('<b style="color:%s">Lots in %s</b>%s %s' % (NAVY, fmt(inn['planned']), (' till ' + kaj_txt(inn)) if inn.get('kaj') else '', status_tag(inn.get('status')))) if inn else ''
-        body += card(lab, ORANGE, s['name'], 'Ligger still sedan ' + fmt(s['anchor_start']), size, dur(h), foot)
+        dest = DESTS.get(str(m), '')
+        sub = ' · '.join(rest + ([size] if size else []) + (['Destination ' + cap(dest)] if dest else []))
+        foot = 'Ligger still sedan ' + fmt(s['anchor_start']) + ('<br>' + lots_in(inn) if inn else '')
+        body += card(ORANGE, s['name'], typ_, kaj_pin(inn, 'Planerad'), sub, dur(h), foot)
     if not redd:
         body += empty('Inga fartyg väntar på redden.')
 
     body += head('PÅ VÄG IN', CYAN)
     for e, name, m, st in coming[:6]:
         lab, size = info(m, st)
+        typ_, *rest = lab.split(' · ')
         inn = next((c for c in lots_for(lots, name) if c['dir'] == 'in' and c.get('status') != 'Avslutad'), None)
-        foot = ('<b style="color:%s">Lots in %s</b>%s %s' % (NAVY, fmt(inn['planned']), (' till ' + kaj_txt(inn)) if inn.get('kaj') else '', status_tag(inn.get('status')))) if inn else ''
-        body += card(lab, CYAN, name, 'Enligt fartygets egen uppgift', size,
-                     '<span style="font-size:14px">' + ('ETA ' + e.astimezone(TZ).strftime('%-d/%-m %H:%M') if e else 'ETA saknas') + '</span>', foot)
+        dest = DESTS.get(str(m), '')
+        sub = ' · '.join(rest + ([size] if size else []) + (['Destination ' + cap(dest)] if dest else []))
+        right = '<span style="font-size:13px">' + ('ETA ' + e.astimezone(TZ).strftime('%y-%m-%d %H:%M') if e else 'ETA saknas') + '</span>'
+        body += card(CYAN, name, typ_, kaj_pin(inn, 'Planerad'), sub, right, lots_in(inn))
     for c in expected:
-        body += card('Lotsplan', CYAN, c['name'], 'Lots in beställd' + (', till ' + kaj_txt(c) if c.get('kaj') else ''),
-                     'Syns inte i AIS-området än', '<span style="font-size:14px">' + fmt(c['planned']) + '</span>', status_tag(c.get('status')))
+        body += card(CYAN, c['name'], 'Lotsplan', kaj_pin(c, 'Planerad'), 'Syns inte i AIS-området än', '', lots_in(c))
     if not coming and not expected:
         body += empty('Inget fartyg har angett Hargshamn som destination.')
 
