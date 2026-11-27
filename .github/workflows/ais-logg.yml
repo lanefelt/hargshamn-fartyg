@@ -41,5 +41,10 @@ jobs:
             echo "Inga ändringar"
           else
             git commit -m "AIS-logg $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push
+            # någon annan kan ha pushat under körningen, hämta och försök igen
+            for i in 1 2 3; do
+              git pull --rebase -q origin main && git push && exit 0
+              sleep 5
+            done
+            exit 1
           fi
