@@ -1,0 +1,76 @@
+{
+ "calls": [
+  {
+   "assigned": false,
+   "dir": "in",
+   "finished": null,
+   "from": "N 3M ENE fyr Svartklubben",
+   "kaj": 5,
+   "kajnamn": "Nya Västra kajen",
+   "name": "CHIOS VICTORY",
+   "ordered": "2026-11-30T11:00:00Z",
+   "planned": "2026-11-30T11:00:00Z",
+   "started": null,
+   "status": "Bekräftad",
+   "to": "5 - Nya Västra kajen - Hargshamn"
+  },
+  {
+   "assigned": true,
+   "dir": "ut",
+   "finished": null,
+   "from": "4 - Stora kajen - Hargshamn",
+   "kaj": 4,
+   "kajnamn": "Stora kajen",
+   "name": "CELTIC PIONEER",
+   "ordered": "2026-11-28T11:00:00Z",
+   "planned": "2026-11-28T11:00:00Z",
+   "started": null,
+   "status": "Bekräftad",
+   "to": "S 2,5 M SE fyr Svartklubben"
+  },
+  {
+   "assigned": true,
+   "dir": "ut",
+   "finished": null,
+   "from": "5 - Nya Västra kajen - Hargshamn",
+   "kaj": 5,
+   "kajnamn": "Nya Västra kajen",
+   "name": "CATHERINE M",
+   "ordered": "2026-11-28T08:00:00Z",
+   "planned": "2026-11-28T08:00:00Z",
+   "started": null,
+   "status": "Bekräftad",
+   "to": "N 3M ENE fyr Svartklubben"
+  },
+  {
+   "assigned": true,
+   "dir": "in",
+   "finished": "2026-11-26T23:25:00Z",
+   "from": "S 2,5 M SE fyr Svartklubben",
+   "kaj": 4,
+   "kajnamn": "Stora kajen",
+   "name": "CELTIC PIONEER",
+   "ordered": "2026-11-26T20:30:00Z",
+   "planned": "2026-11-26T20:30:00Z",
+   "started": "2026-11-26T21:05:00Z",
+   "status": "Avslutad",
+   "to": "4 - Stora kajen - Hargshamn"
+  },
+  {
+   "assigned": true,
+   "dir": "ut",
+   "finished": "2026-11-25T23:25:00Z",
+   "from": "4 - Stora kajen - Hargshamn",
+   "kaj": 4,
+   "kajnamn": "Stora kajen",
+   "name": "STELLAMAR",
+   "ordered": "2026-11-25T21:00:00Z",
+   "planned": "2026-11-25T21:00:00Z",
+   "started": "2026-11-25T21:20:00Z",
+   "status": "Avslutad",
+   "to": "N 3M ENE fyr Svartklubben"
+  }
+ ],
+ "source": "https://app.sjofartsverket.se/pilotinfo",
+ "updated": "2026-11-27T09:50:42Z"
+}
