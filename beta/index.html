@@ -32,6 +32,8 @@
   .card .right { text-align:right; font-size:12px; color:var(--muted); }
   .card .right b { color:var(--ink); font-size:13px; }
   .empty { color:var(--muted); font-size:13px; padding:6px 2px 10px; }
+  .pin { width:12px; height:12px; vertical-align:-1px; fill:var(--blue); margin-right:4px; }
+  .card .nm .tag { margin-left:6px; vertical-align:2px; }
   .tag { display:inline-block; font-size:10px; font-weight:bold; letter-spacing:.06em; padding:2px 6px; border-radius:3px; background:var(--bg); color:var(--muted); text-transform:uppercase; }
   .card .log { grid-column:1 / -1; font-size:12px; color:var(--ink); border-top:1px dashed var(--line); padding-top:6px; }
   .card .log b { color:var(--navy); }
@@ -147,11 +149,12 @@
 <script>
 const API = 'https://meri.digitraffic.fi/api/ais/v1';
 const HDR = { headers: { 'Digitraffic-User': 'HargsHamnKMA/1.0' } };
+const PIN = '<svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
 const PORT = [60.1686, 18.4890];         // kajerna i Hargshamn
 const QUAY_KM = 1.2, NEAR_KM = 25;        // kajzon och närområde
 const DEST = /HARG|SEHAN/i;               // destination som besättningen anger (SEHAN = Hargshamn)
 const NAV = {0:'Under gång',1:'Ankrad',2:'Ej manöverbar',3:'Begränsad manöverförmåga',5:'Förtöjd',8:'Seglar',15:'Ingen uppgift'};
-const TYPE = t => t>=70&&t<80?'Last':t>=80&&t<90?'Tank':t>=60&&t<70?'Passagerare':t===52?'Bogserbåt':t===50?'Lots':t===30?'Fiske':'Övrigt';
+const TYPE = t => t>=70&&t<80?'Lastfartyg':t>=80&&t<90?'Tankfartyg':t>=60&&t<70?'Passagerarfartyg':t===52?'Bogserbåt':t===50?'Lotsbåt':t===30?'Fiskefartyg':'Övrigt';
 const big = t => t>=70 && t<90;           // last- och tankfartyg
 const names = {};
 let LOG = { ships:{} }, HIST = [], LOTS = [];
@@ -174,7 +177,7 @@ async function loadLog() {
 function logLine(mmsi, kind) {
   const s = (LOG.ships||{})[String(mmsi)];
   if (!s) return '';
-  if (kind==='q') return s.before_log ? 'Ankom före loggstart' : s.arrival ? 'Ankom <b>'+fmt(s.arrival)+'</b> · vid kaj '+dur(since(s.arrival))+(s.anchor_start?' · väntade på redden '+dur((new Date(s.arrival)-new Date(s.anchor_start))/3600000):'') : '';
+  if (kind==='q') return s.before_log ? 'Ankom före loggstart' : s.arrival ? 'Ankom <b>'+fmt(s.arrival)+'</b>'+(s.anchor_start?' · väntade på redden '+dur((new Date(s.arrival)-new Date(s.anchor_start))/3600000):' · ingen väntan på redden') : '';
   if (kind==='r') return s.anchor_start ? 'Ligger still sedan <b>'+fmt(s.anchor_start)+'</b> · '+dur(since(s.anchor_start)) : '';
   return '';
 }
@@ -239,18 +242,18 @@ const STATUS_CLS = { 'Preliminär':'b-pre', 'Definitiv':'b-st', 'Bekräftad':'b-
 const kajTxt = c => c && c.kaj ? 'kaj '+c.kaj+(c.kajnamn ? ' '+c.kajnamn : '') : '';
 const open_ = c => c.status !== 'Avslutad';
 function lotsFor(name) { const n = String(name||'').trim().toUpperCase(); return LOTS.filter(c => c.name === n); }
-function lotsLine(name, kind) {
+const cap = x => String(x||'').trim().toLowerCase().replace(/(^|[\s\-\/])\S/g, m => m.toUpperCase());
+function lotsLine(name, kind, dest) {
   const cs = lotsFor(name); if (!cs.length) return '';
   const byT = (a,b) => (a.planned||'').localeCompare(b.planned||'');
   if (kind === 'q') {
     const ut = cs.filter(c => c.dir==='ut' && open_(c)).sort(byT)[0];
-    const kaj = kajTxt(ut || cs.filter(c => c.dir==='in').sort(byT).pop());
-    if (!ut) return kaj ? 'Ligger vid '+kaj+' enligt lotsplanen' : '';
-    return 'Avgår enligt lotsplanen <b>'+fmt(ut.planned)+'</b> <span class="badge '+(STATUS_CLS[ut.status]||'b-st')+'">'+ut.status+'</span>'+(kaj ? ' · '+kaj : '');
+    if (!ut) return '';
+    return 'Avgår enligt lotsplanen <b>'+fmt(ut.planned)+'</b>'+(dest && !DEST.test(dest) ? ' till <b>'+esc(cap(dest))+'</b>' : '')+' <span class="badge '+(STATUS_CLS[ut.status]||'b-st')+'">'+ut.status+'</span>';
   }
   const inn = cs.filter(c => c.dir==='in' && open_(c)).sort(byT)[0];
   if (!inn) return '';
-  return 'Lots in beställd <b>'+fmt(inn.planned)+'</b> <span class="badge '+(STATUS_CLS[inn.status]||'b-st')+'">'+inn.status+'</span>'+(inn.kaj ? ' · till '+kajTxt(inn) : '');
+  return 'Lots in beställd <b>'+fmt(inn.planned)+'</b> <span class="badge '+(STATUS_CLS[inn.status]||'b-st')+'">'+inn.status+'</span>';
 }
 const ombord = c => fmt(c.started)+(c.finished ? '–'+new Date(c.finished).toLocaleTimeString('sv-SE',{...tz,hour:'2-digit',minute:'2-digit'}) : '');
 function renderLots() {
@@ -449,11 +452,23 @@ function icon(color, heading, moving) {
 }
 function card(v, p, dist, extra, kind) {
   const d = document.createElement('div'); d.className='card';
-  d.innerHTML = '<div><div class="nm">'+(v.name||('MMSI '+p.mmsi))+'</div><div class="meta"><span class="tag">'+TYPE(v.shipType)+'</span> '
-    +(NAV[p.navStat]||'')+(v.destination?' · Destination '+v.destination:'')+'</div></div>'
+  const cs = lotsFor(v.name), byT = (a,b) => (a.planned||'').localeCompare(b.planned||'');
+  const ins = cs.filter(c => c.dir==='in').sort(byT), utOpen = cs.filter(c => c.dir==='ut' && open_(c)).sort(byT)[0];
+  let meta;
+  if (kind === 'q') {
+    // vid kaj: kajen enligt lotsplanen och tiden vid kaj enligt loggen
+    const k = utOpen || ins[ins.length-1], s = (LOG.ships||{})[String(p.mmsi)];
+    const t = s && s.before_log ? ' · sedan före loggstart' : s && s.arrival ? ' · '+dur(since(s.arrival)) : '';
+    meta = PIN+'Förtöjd vid kaj'+(k && k.kaj ? ' '+k.kaj+' '+esc(k.kajnamn||'') : '')+t;
+  } else {
+    const nxt = ins.filter(open_)[0];
+    meta = (NAV[p.navStat]||'')+(v.destination ? (NAV[p.navStat] ? ' · ' : '')+'Destination '+esc(cap(v.destination)) : '')
+      +(nxt && nxt.kaj ? '<br>'+PIN+'Planerad kaj '+nxt.kaj+' '+esc(nxt.kajnamn||'') : '');
+  }
+  d.innerHTML = '<div><div class="nm">'+esc(v.name||('MMSI '+p.mmsi))+'<span class="tag">'+TYPE(v.shipType)+'</span></div><div class="meta">'+meta+'</div></div>'
     +'<div class="right"><b>'+(p.sog!=null?p.sog.toFixed(1)+' knop':'')+'</b><br>'+(extra||dist.toFixed(1)+' km från kaj')+'<br>'+ago(p.timestampExternal)+'</div>';
   const ll = logLine(p.mmsi, kind); if (ll) d.innerHTML += '<div class="log">'+ll+'</div>';
-  const lo = lotsLine(v.name, kind); if (lo) d.innerHTML += '<div class="log lotsrow">'+lo+'</div>';
+  const lo = lotsLine(v.name, kind, v.destination); if (lo) d.innerHTML += '<div class="log lotsrow">'+lo+'</div>';
   d.onclick = () => { map.setView([p.lat,p.lon], 13); openShip(p.mmsi, p); };
   return d;
 }
