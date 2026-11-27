@@ -80,6 +80,7 @@
   .fc { display:flex; gap:6px; overflow-x:auto; padding:10px 2px 4px; }
   .fc div { flex:0 0 58px; background:#fff; border:1px solid var(--line); border-radius:6px; text-align:center; padding:6px 2px; font-size:11px; color:var(--muted); }
   .fc b { display:block; color:var(--navy); font-size:14px; margin:2px 0; }
+  .fc .arr { display:block; margin:3px auto 0; width:18px; height:18px; }
   .fc .hi { border-color:#C2410C; background:#FDF2EC; } .fc .hi b { color:#C2410C; }
   .fc .day { flex-basis:auto; background:none; border:0; writing-mode:vertical-rl; transform:rotate(180deg); font-weight:bold; color:var(--blue); padding:0; }
   .warn { background:#FFF4E0; border-left:4px solid #E8A33D; border-radius:4px; padding:9px 12px; font-size:13px; margin:10px 0 0; }
@@ -388,7 +389,15 @@ async function load() {
       if (!arr.length) { el.innerHTML='<div class="empty">'+empty+'</div>'; return; }
       arr.sort((a,b)=>a[2]-b[2]).forEach(([v,p,d,x]) => el.appendChild(card(v,p,d,x,id.slice(1)))); };
     put('lq', q, 'Inget fartyg vid kaj just nu.'); put('lr', s, 'Inga fartyg ligger still i närheten.'); put('lw', w, 'Inget fartyg har angett Hargshamn som destination.');
-    document.getElementById('nq').textContent=q.length; document.getElementById('nr').textContent=s.length; document.getElementById('nw').textContent=w.length;
+    // fartyg som har lots in beställd men som inte syns ovan
+    const seen = new Set([...q, ...s, ...w].map(([v]) => String(v.name||'').trim().toUpperCase()));
+    const exp = LOTS.filter(c => c.dir==='in' && open_(c) && !seen.has(c.name)).sort((a,b) => (a.planned||'').localeCompare(b.planned||''));
+    if (exp.length) { const el = document.getElementById('lw'); if (!w.length) el.innerHTML = '';
+      exp.forEach(c => { const d = document.createElement('div'); d.className = 'card'; d.style.cursor = 'default';
+        d.innerHTML = '<div><div class="nm">'+esc(c.name)+'</div><div class="meta"><span class="tag">Lotsplan</span> Lots in beställd, syns inte i AIS-området än</div></div>'
+          +'<div class="right"><b>'+fmt(c.planned)+'</b><br>'+(c.kaj ? 'till '+esc(kajTxt(c)) : '')+'<br><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></div>';
+        el.appendChild(d); }); }
+    document.getElementById('nq').textContent=q.length; document.getElementById('nr').textContent=s.length; document.getElementById('nw').textContent=w.length+exp.length;
     document.getElementById('upd').textContent = 'Uppdaterad '+new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('err').style.display='none';
   } catch(e) {
