@@ -379,13 +379,13 @@ function sizeWind() { const m = document.getElementById('map'); const r = window
   windCanvas.width = m.clientWidth * r; windCanvas.height = m.clientHeight * r; windCanvas.style.width = m.clientWidth+'px'; windCanvas.style.height = m.clientHeight+'px';
   wctx.setTransform(r,0,0,r,0,0); parts = []; }
 function spawn(w, h) { return { x:Math.random()*w, y:Math.random()*h, age:Math.floor(Math.random()*120), t:[] }; }
-const TRAIL = 18;
+const TRAIL = 10;
 function windFrame() {
   const w = windCanvas.clientWidth, h = windCanvas.clientHeight;
   if (WIND.dir != null && !document.hidden && w) {
-    if (!parts.length) parts = Array.from({ length: Math.round(w*h/1300) }, () => spawn(w, h));
+    if (!parts.length) parts = Array.from({ length: Math.round(w*h/3200) }, () => spawn(w, h));
     wctx.clearRect(0, 0, w, h);
-    const to = (WIND.dir + 180) * Math.PI/180, v = 0.6 + Math.min(WIND.ms, 25) * 0.2;
+    const to = (WIND.dir + 180) * Math.PI/180, v = 0.45 + Math.min(WIND.ms, 25) * 0.15;
     const dx = Math.sin(to)*v, dy = -Math.cos(to)*v;
     for (const p of parts) {
       const f = 1 + (p.age % 9)/18;
@@ -394,10 +394,10 @@ function windFrame() {
       if (p.age > 160 || p.x < -20 || p.y < -20 || p.x > w+20 || p.y > h+20) Object.assign(p, spawn(w, h), { age:0 });
     }
     // svansen ritas i lager, svagast längst bak
-    wctx.lineCap = 'round'; wctx.lineWidth = 2.2;
+    wctx.lineCap = 'round'; wctx.lineWidth = 1.3;
     wctx.strokeStyle = ODOR(WIND.dir) ? '#B91C1C' : '#0B1F33';
     for (let k = 1; k < TRAIL; k++) {
-      wctx.globalAlpha = 0.75 * k / TRAIL; wctx.beginPath();
+      wctx.globalAlpha = 0.38 * k / TRAIL; wctx.beginPath();
       for (const p of parts) { const a = p.t[k-1], b = p.t[k]; if (a && b) { wctx.moveTo(a[0], a[1]); wctx.lineTo(b[0], b[1]); } }
       wctx.stroke();
     }
