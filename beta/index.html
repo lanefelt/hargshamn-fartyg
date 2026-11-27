@@ -401,12 +401,26 @@ const windBadge = L.control({ position:'bottomleft' });
 windBadge.onAdd = () => { const d = L.DomUtil.create('div', 'windb'); d.id = 'windb'; d.style.display = 'none'; return d; };
 windBadge.addTo(map);
 function setWind(dir, ms) {
-  WIND.dir = dir; WIND.ms = ms;
+  WIND.dir = dir; WIND.ms = ms; if (calm) windStatic();
   const b = document.getElementById('windb');
   if (b) { b.style.display = 'flex'; b.innerHTML = arrow(dir)+'<span>'+n1(ms)+' m/s från '+dirTxt(dir)+(ODOR(dir) ? ' <small style="color:#B91C1C">mot samhället</small>' : '')+'<br><small>Vind i hamnen nu, SMHI</small></span>'; }
 }
 sizeWind(); window.addEventListener('resize', sizeWind); map.on('zoomstart movestart', () => wctx.clearRect(0,0,windCanvas.width,windCanvas.height));
-if (!calm) requestAnimationFrame(windFrame);
+// stilla vindpilar för den som har valt minskade rörelser i telefonen eller datorn
+function windStatic() {
+  const w = windCanvas.clientWidth, h = windCanvas.clientHeight; wctx.clearRect(0,0,w,h);
+  if (WIND.dir == null) return;
+  const to = (WIND.dir + 180) * Math.PI/180, L = 12 + Math.min(WIND.ms, 20);
+  wctx.strokeStyle = 'rgba(10,98,158,0.5)'; wctx.fillStyle = 'rgba(10,98,158,0.5)'; wctx.lineWidth = 1.6;
+  for (let y = 40; y < h; y += 70) for (let x = 40 + ((y/70) % 2) * 35; x < w; x += 70) {
+    const ex = x + Math.sin(to)*L/2, ey = y - Math.cos(to)*L/2, sx = x - Math.sin(to)*L/2, sy = y + Math.cos(to)*L/2;
+    wctx.beginPath(); wctx.moveTo(sx, sy); wctx.lineTo(ex, ey); wctx.stroke();
+    wctx.beginPath(); wctx.moveTo(ex, ey);
+    wctx.lineTo(ex - Math.sin(to - 0.5)*6, ey + Math.cos(to - 0.5)*6); wctx.lineTo(ex - Math.sin(to + 0.5)*6, ey + Math.cos(to + 0.5)*6); wctx.fill();
+  }
+}
+if (calm) { window.addEventListener('resize', () => setTimeout(windStatic, 50)); map.on('zoomend moveend', windStatic); }
+else requestAnimationFrame(windFrame);
 if (window.__wind) setWind(window.__wind[0], window.__wind[1]);
 
 const km = (a,b) => { const R=6371, r=x=>x*Math.PI/180, dLa=r(b[0]-a[0]), dLo=r(b[1]-a[1]);
