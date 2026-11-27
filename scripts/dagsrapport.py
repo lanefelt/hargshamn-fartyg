@@ -399,6 +399,24 @@ def lots_rows(show, done):
     return '<div style="background:#ffffff;border-radius:8px;padding:4px 16px 6px"><table role="presentation" width="100%%" cellspacing="0" cellpadding="0">%s%s</table></div>' % (hdr, rows)
 
 
+def sanctions_block():
+    """Röd ruta överst om sanktionskontrollen (scripts/sanktion.py) har träffar."""
+    hits = (logg.load('sanktion.json', {}) or {}).get('hits') or {}
+    if not hits:
+        return ''
+    who = {'EU': 'EU', 'UK': 'Storbritannien', 'US': 'USA (OFAC)'}
+    rows = ''.join('<div style="margin-top:4px"><b>%s</b>%s, %s: %s %s</div>' % (
+        h['name'], (' (IMO %s)' % h['imo']) if h.get('imo') else '', h.get('var', ''),
+        'finns på' if h.get('sure') else 'namnet matchar, IMO saknas, kontrollera:',
+        ', '.join(who.get(k, k) + ((' ' + r) if r else '') for k, r in sorted(h['lists'].items())))
+        for h in hits.values())
+    red = any(h.get('sure') and 'EU' in h['lists'] for h in hits.values())
+    return ('<div style="background:%s;color:%s;border-radius:8px;padding:12px 16px;margin:14px 0 0;font-size:13px;line-height:1.5;font-family:Arial,Helvetica,sans-serif">'
+            '<div style="font-size:11px;font-weight:bold;letter-spacing:1px">SANKTIONSKONTROLL</div>%s'
+            '<div style="margin-top:6px;font-size:12px">Kontrollera uppgifterna mot listan innan beslut.</div></div>') % (
+        '#FCEBEB' if red else '#FFF4E0', '#791F1F' if red else '#7A4800', rows)
+
+
 def build(now, ships, anlop, coming, lots=None, wx=None):
     day = now - timedelta(hours=24)
     quay = [(m, s) for m, s in ships.items() if s.get('arrival') or s.get('before_log')]
@@ -408,7 +426,7 @@ def build(now, ships, anlop, coming, lots=None, wx=None):
     expected = [c for c in sorted(lots, key=lambda c: c.get('planned') or '')
                 if c['dir'] == 'in' and c.get('status') != 'Avslutad' and c['name'] not in known]
 
-    body = head('VID KAJ', GREEN)
+    body = sanctions_block() + head('VID KAJ', GREEN)
     for m, s in sorted(quay, key=lambda x: x[1].get('arrival') or ''):
         lab, size = info(m, s.get('shipType'))
         typ_, *rest = lab.split(' · ')
