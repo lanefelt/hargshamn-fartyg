@@ -180,9 +180,11 @@ const sxTags = h => !h ? '' : !h.sure ? '<span class="tag sx-a">Möjlig träff</
 function sxText(h) {
   const ls = Object.keys(h.lists).sort(), who = ls.map(k => SXL[k]).join(' och ');
   if (!h.sure) return 'Namnet finns på '+who+' sanktionslista. IMO-nummer saknas, så träffen är inte säker. Kontrollera.';
-  if (h.lists.EU) return 'IMO '+h.imo+' finns på EU:s lista över sanktionerade fartyg ('+esc(h.lists.EU)+')'+(/XLII/.test(h.lists.EU) ? '. För de fartygen gäller förbud mot hamnanlöp' : '')+'. Kontrollera innan anlöp.';
+  if (h.lists.EU) return 'IMO '+h.imo+' finns på EU:s lista över sanktionerade fartyg, '+esc(h.lists.EU)+''+(/XLII/.test(h.lists.EU) ? '. För de fartygen gäller förbud mot hamnanlöp' : '')+'. Kontrollera innan anlöp.';
   return 'IMO '+h.imo+' finns på '+who+' sanktionslista. Den binder inte svenska hamnar men kan påverka försäkring och betalningar. Kontrollera.';
 }
+// i lotstabellen räcker ett märke: EU om det finns, annars första
+const sxTag1 = h => !h ? '' : !h.sure ? sxTags(h) : sxTags({ sure:true, lists:{ [h.lists.EU ? 'EU' : Object.keys(h.lists).sort()[0]]:'' } });
 const sxCls = h => h && h.sure && h.lists.EU ? '' : ' a';
 function sxBox(name, imo) {
   if (!SX) return '<h4>Sanktionskontroll</h4><div class="sxbox">Sanktionslistorna kunde inte läsas just nu.</div>';
@@ -304,7 +306,7 @@ const ombord = c => fmt(c.started)+(c.finished ? '–'+new Date(c.finished).toLo
 function renderLots() {
   const el = document.getElementById('lots'); if (!el) return;
   const now = Date.now(), T = c => new Date(c.planned || c.ordered).getTime();
-  const row = (c, done) => '<tr><td>'+fmt(done ? (c.finished || c.started || c.planned) : c.planned)+'</td><td>'+DIRB(c.dir)+'</td><td><b>'+esc(c.name)+'</b>'+sxTags(sxFor(c.name, (Object.values(names).find(x => sxNorm(x.name) === sxNorm(c.name))||{}).imo))+(c.started ? '<div class="mob">Lots ombord '+ombord(c)+'</div>' : '')+'</td><td>'+(c.kaj ? c.kaj+'<span class="kn"> '+esc(c.kajnamn||'')+'</span>' : '')
+  const row = (c, done) => '<tr><td>'+fmt(done ? (c.finished || c.started || c.planned) : c.planned)+'</td><td>'+DIRB(c.dir)+'</td><td><b>'+esc(c.name)+'</b>'+sxTag1(sxFor(c.name, (Object.values(names).find(x => sxNorm(x.name) === sxNorm(c.name))||{}).imo))+(c.started ? '<div class="mob">Lots ombord '+ombord(c)+'</div>' : '')+'</td><td>'+(c.kaj ? c.kaj+'<span class="kn"> '+esc(c.kajnamn||'')+'</span>' : '')
       +'</td><td><span class="badge '+(STATUS_CLS[c.status]||'b-st')+'">'+esc(c.status)+'</span></td><td class="lo">'+(c.started ? ombord(c) : '')+'</td></tr>';
   const table = (rows, done) => '<table class="hist"><tr><th>'+(done ? 'Avslutad' : 'Planerad')+'</th><th></th><th>Fartyg</th><th>Kaj</th><th>Status</th><th class="lo">Lots ombord</th></tr>'+rows.map(c => row(c, done)).join('')+'</table>';
   // aktuella: allt som inte är avslutat, äldsta först
