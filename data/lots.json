@@ -22,8 +22,8 @@
    "kaj": 4,
    "kajnamn": "Stora kajen",
    "name": "CELTIC PIONEER",
-   "ordered": "2026-11-28T11:00:00Z",
-   "planned": "2026-11-28T11:00:00Z",
+   "ordered": "2026-11-28T12:30:00Z",
+   "planned": "2026-11-28T12:30:00Z",
    "started": null,
    "status": "Bekräftad",
    "to": "S 2,5 M SE fyr Svartklubben"
@@ -72,5 +72,5 @@
   }
  ],
  "source": "https://app.sjofartsverket.se/pilotinfo",
- "updated": "2026-11-27T09:50:42Z"
+ "updated": "2026-11-27T12:31:02Z"
 }
