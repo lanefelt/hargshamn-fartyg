@@ -13,7 +13,7 @@ concurrency:
 jobs:
   logg:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,6 +21,17 @@ jobs:
           python-version: '3.12'
       - name: Hämta AIS och uppdatera loggen
         run: python scripts/logg.py
+      - name: Hämta lotsplanen
+        continue-on-error: true
+        run: python scripts/lots.py
+      - name: Spara väder och vattenstånd
+        continue-on-error: true
+        run: python scripts/vader.py
+      - name: Hämta båtlistan
+        continue-on-error: true
+        env:
+          JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
+        run: python scripts/plan.py
       - name: Spara ändringar
         run: |
           git config user.name "github-actions[bot]"
