@@ -156,6 +156,9 @@ window.LOADER = (() => {
   requestAnimationFrame(frame);
   const finish = () => { if (finished) return; finished = true; setTimeout(() => { closing = true; }, Math.max(0, MIN - (performance.now() - t0))); };
   setTimeout(finish, 10000);
+  // stäng så snart första fartygskortet eller ett felmeddelande syns, resten fylls på som vanligt
+  const mo = new MutationObserver(() => { if (document.querySelector('.card') || (document.getElementById('err') || {}).style?.display === 'block') { mo.disconnect(); finish(); } });
+  addEventListener('DOMContentLoaded', () => mo.observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['style'] }));
   return { done: finish };
 })();
 </script>
