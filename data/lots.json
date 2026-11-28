@@ -15,7 +15,7 @@
    "to": "N 3M ENE fyr Svartklubben"
   },
   {
-   "assigned": false,
+   "assigned": true,
    "dir": "in",
    "finished": null,
    "from": "N 3M ENE fyr Svartklubben",
@@ -86,5 +86,5 @@
   }
  ],
  "source": "https://app.sjofartsverket.se/pilotinfo",
- "updated": "2026-11-27T23:01:12Z"
+ "updated": "2026-11-28T05:31:00Z"
 }
