@@ -154,7 +154,9 @@ window.LOADER = (() => {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  const finish = () => { if (finished) return; finished = true; setTimeout(() => { closing = true; }, Math.max(0, MIN - (performance.now() - t0))); };
+  const finish = () => { if (finished) return; finished = true; const w = Math.max(0, MIN - (performance.now() - t0)); setTimeout(() => { closing = true; }, w);
+    // reserv om animationerna är pausade (dold flik): stäng ändå
+    setTimeout(() => { if (el.isConnected) { el.classList.add('out'); setTimeout(() => el.remove(), 500); } }, w + 900); };
   setTimeout(finish, 10000);
   // stäng så snart första fartygskortet eller ett felmeddelande syns, resten fylls på som vanligt
   const mo = new MutationObserver(() => { if (document.querySelector('.card') || (document.getElementById('err') || {}).style?.display === 'block') { mo.disconnect(); finish(); } });
