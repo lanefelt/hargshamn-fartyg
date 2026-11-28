@@ -45,7 +45,7 @@
   {
    "assigned": true,
    "dir": "ut",
-   "finished": null,
+   "finished": "2026-11-28T10:20:00Z",
    "from": "5 - Nya Västra kajen - Hargshamn",
    "kaj": 5,
    "kajnamn": "Nya Västra kajen",
@@ -53,7 +53,7 @@
    "ordered": "2026-11-28T08:00:00Z",
    "planned": "2026-11-28T08:00:00Z",
    "started": "2026-11-28T07:45:00Z",
-   "status": "Pågående",
+   "status": "Avslutad",
    "to": "N 3M ENE fyr Svartklubben"
   },
   {
@@ -86,5 +86,5 @@
   }
  ],
  "source": "https://app.sjofartsverket.se/pilotinfo",
- "updated": "2026-11-28T08:31:07Z"
+ "updated": "2026-11-28T10:31:04Z"
 }
